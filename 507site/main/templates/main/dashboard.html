@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - PDMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="page-title">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </h1>
+    
+    <!-- Status Cards Row -->
+    <div class="row g-4 mb-4">
+        <!-- Product Backlog Card -->
+        <div class="col-md-3">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <div class="stat-number text-primary">
+                        {{ backlog_count }}
+                    </div>
+                    <div class="stat-label">
+                        <i class="bi bi-list-ul"></i> Product Backlog
+                    </div>
+                    <a href="#" class="btn btn-sm btn-outline-primary mt-3">View All</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sprint Backlog Card -->
+        <div class="col-md-3">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <div class="stat-number" style="color: #378DBD;">
+                        {{ sprint_count }}
+                    </div>
+                    <div class="stat-label">
+                        <i class="bi bi-calendar-week"></i> Sprint Backlog
+                    </div>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #378DBD; color: #378DBD;">View All</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ready for Test Card -->
+        <div class="col-md-3">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <div class="stat-number text-info">
+                        {{ testing_count }}
+                    </div>
+                    <div class="stat-label">
+                        <i class="bi bi-clipboard-check"></i> Ready for Test
+                    </div>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #378DBD; color: #378DBD;">View All</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Complete Card -->
+        <div class="col-md-3">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <div class="stat-number text-success">
+                        {{ complete_count }}
+                    </div>
+                    <div class="stat-label">
+                        <i class="bi bi-check-circle"></i> Complete
+                    </div>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #70B865; color: #70B865;">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- My Tasks Section -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-person-check"></i> My Assigned Tasks
+                </div>
+                <div class="card-body p-0">
+                    {% if my_tasks %}
+                        {% for task in my_tasks %}
+                        <div class="task-list-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ task.title }}</h6>
+                                    <small class="text-muted">
+                                        <span class="badge badge-priority-{{ task.priority }}">
+                                            {{ task.get_priority_display }}
+                                        </span>
+                                        <span class="badge bg-secondary ms-2">
+                                            {{ task.get_status_display }}
+                                        </span>
+                                    </small>
+                                </div>
+                                <div>
+                                    <a href="#" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="bi bi-inbox" style="font-size: 3rem; color: #0C234B;"></i>
+                            <p class="mt-3">No tasks assigned to you yet.</p>
+                            <a href="/admin/main/task/add/" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Create First Task
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/admin/main/task/add/" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Create New Task
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-list-ul"></i> View Product Backlog
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-calendar-week"></i> View Sprint Backlog
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-clipboard-check"></i> View Testing Queue
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Info Card -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> System Info
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Total Tasks:</strong> 
+                        {{ backlog_count|add:sprint_count|add:testing_count|add:complete_count }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Active:</strong> 
+                        {{ backlog_count|add:sprint_count|add:testing_count }}
+                    </p>
+                    <p class="mb-0">
+                        <strong>User:</strong> {{ user.username }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Workflow Diagram -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-diagram-3"></i> Task Workflow
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="text-center p-3">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #AB0520; color: white;">
+                                Product Backlog
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <i class="bi bi-arrow-right" style="font-size: 2rem; color: #0C234B;"></i>
+                        </div>
+                        <div class="text-center p-3">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #378DBD; color: white;">
+                                Sprint Backlog
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <i class="bi bi-arrow-right" style="font-size: 2rem; color: #0C234B;"></i>
+                        </div>
+                        <div class="text-center p-3">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #378DBD; color: white;">
+                                Ready for Test
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <i class="bi bi-arrow-right" style="font-size: 2rem; color: #0C234B;"></i>
+                        </div>
+                        <div class="text-center p-3">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #70B865; color: white;">
+                                Pass → Complete
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            If test fails, task returns to Sprint Backlog for re-work
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

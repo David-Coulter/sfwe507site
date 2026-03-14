@@ -5,7 +5,7 @@ from django.utils import timezone
 
 class Task(models.Model):
   
-    # Status Choices - matching your workflow
+    # Status Choices
     STATUS_CHOICES = [
         ('BACKLOG', 'Product Backlog'),
         ('SPRINT', 'Sprint Backlog'),
