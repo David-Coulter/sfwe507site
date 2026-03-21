@@ -14,13 +14,13 @@
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-primary">
+                    <div class="stat-number text-info" >
                         {{ backlog_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-list-ul"></i> Product Backlog
                     </div>
-                    <a href="#" class="btn btn-sm btn-outline-primary mt-3">View All</a>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #007D84; color: #007D84;">View All</a>
                 </div>
             </div>
         </div>
@@ -29,13 +29,13 @@
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number" style="color: #378DBD;">
+                    <div class="stat-number text-info">
                         {{ sprint_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-calendar-week"></i> Sprint Backlog
                     </div>
-                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #378DBD; color: #378DBD;">View All</a>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #81D3EB; color: #81D3EB;">View All</a>
                 </div>
             </div>
         </div>
@@ -44,13 +44,13 @@
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-info">
+                    <div class="stat-number text-info" color="#A95C42">
                         {{ testing_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-clipboard-check"></i> Ready for Test
                     </div>
-                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #378DBD; color: #378DBD;">View All</a>
+                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #A95C42; color: #A95C42;">View All</a>
                 </div>
             </div>
         </div>
@@ -59,7 +59,7 @@
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-success">
+                    <div class="stat-number text-success" color="#70B865">
                         {{ complete_count }}
                     </div>
                     <div class="stat-label">
@@ -70,10 +70,35 @@
             </div>
         </div>
     </div>
+
+    <!-- Quick Actions Sidebar -->
+    <div class="row">
+        <div class="col-lg-3">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'create_task' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Create New Task
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-list-ul"></i> View Product Backlog
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-calendar-week"></i> View Sprint Backlog
+                        </a>
+                        <a href="#" class="btn btn-outline-secondary">
+                            <i class="bi bi-clipboard-check"></i> View Testing Queue
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     
     <!-- My Tasks Section -->
-    <div class="row">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card shadow-sm">
                 <div class="card-header">
                     <i class="bi bi-person-check"></i> My Assigned Tasks
@@ -106,38 +131,19 @@
                         <div class="p-4 text-center text-muted">
                             <i class="bi bi-inbox" style="font-size: 3rem; color: #0C234B;"></i>
                             <p class="mt-3">No tasks assigned to you yet.</p>
-                            <a href="/admin/main/task/add/" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Create First Task
+                            <a href="{% url 'create_task' %}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Create Your First Task
                             </a>
                         </div>
                     {% endif %}
                 </div>
             </div>
         </div>
-        
-        <!-- Quick Actions Sidebar -->
-        <div class="col-lg-4">
-            <div class="card shadow-sm mb-3">
-                <div class="card-header">
-                    <i class="bi bi-lightning"></i> Quick Actions
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="/admin/main/task/add/" class="btn btn-primary">
-                            <i class="bi bi-plus-circle"></i> Create New Task
-                        </a>
-                        <a href="#" class="btn btn-outline-secondary">
-                            <i class="bi bi-list-ul"></i> View Product Backlog
-                        </a>
-                        <a href="#" class="btn btn-outline-secondary">
-                            <i class="bi bi-calendar-week"></i> View Sprint Backlog
-                        </a>
-                        <a href="#" class="btn btn-outline-secondary">
-                            <i class="bi bi-clipboard-check"></i> View Testing Queue
-                        </a>
-                    </div>
-                </div>
-            </div>
+    </div>
+    
+    <!-- System Info Section -->
+    <div class="row">
+        <div class="col-lg-12">
             
             <!-- System Info Card -->
             <div class="card shadow-sm">
@@ -171,7 +177,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center flex-wrap">
                         <div class="text-center p-3">
-                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #AB0520; color: white;">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #007D84; color: white;">
                                 Product Backlog
                             </div>
                         </div>
@@ -179,7 +185,7 @@
                             <i class="bi bi-arrow-right" style="font-size: 2rem; color: #0C234B;"></i>
                         </div>
                         <div class="text-center p-3">
-                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #378DBD; color: white;">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #81D3EB; color: white;">
                                 Sprint Backlog
                             </div>
                         </div>
@@ -187,7 +193,7 @@
                             <i class="bi bi-arrow-right" style="font-size: 2rem; color: #0C234B;"></i>
                         </div>
                         <div class="text-center p-3">
-                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #378DBD; color: white;">
+                            <div class="badge" style="font-size: 1.2rem; padding: 0.8rem 1.5rem; background-color: #A95C42; color: white;">
                                 Ready for Test
                             </div>
                         </div>
