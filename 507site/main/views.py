@@ -1,6 +1,8 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .models import Task
+from .forms import TaskForm
 
 
 @login_required
@@ -22,5 +24,29 @@ def dashboard(request):
         'complete_count': complete_count,
         'my_tasks': my_tasks,
     }
-    
     return render(request, 'main/dashboard.html', context)
+
+@login_required
+def create_task(request):
+    if request.method == 'POST':
+        form = TaskForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.created_by = request.user
+            task.status = 'BACKLOG'
+            task.save()
+
+            messages.success(request, f'Task "{task.title}" created successfully!')
+            return redirect('dashboard')
+    else:
+            form = TaskForm()
+        
+    context = {
+        'form': form,
+        'page_title': 'Create a New Task',
+    }
+    
+    return render(request, 'main/task_form.html', context)
+
+
+        
