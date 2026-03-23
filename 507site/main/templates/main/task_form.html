@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} - PDMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="page-title">
+                    <i class="bi bi-plus-circle"></i> {{ page_title }}
+                </h1>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+            
+            <!-- Task Form Card -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-list-task"></i> Task Information
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Title Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.title.id_for_label }}" class="form-label">
+                                {{ form.title.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.title }}
+                            {% if form.title.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.title.errors }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Description Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">
+                                {{ form.description.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.description.errors }}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Markdown Help -->
+                            <div class="accordion accordion-flush mt-2" id="markdownHelp">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed p-2" type="button" 
+                                                data-bs-toggle="collapse" data-bs-target="#markdownGuide" 
+                                                style="font-size: 0.9rem; background-color: #E2E9EB;">
+                                            <i class="bi bi-markdown"></i> &nbsp; Task Description Markdown Guide
+                                        </button>
+                                    </h2>
+                                    <div id="markdownGuide" class="accordion-collapse collapse" data-bs-parent="#markdownHelp">
+                                        <div class="accordion-body p-3" style="background-color: #E2E9EB; font-size: 0.85rem;">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <strong>Text Formatting:</strong>
+                                                    <ul class="list-unstyled ms-2 mb-2">
+                                                        <li><code>**bold text**</code> → <strong>bold text</strong></li>
+                                                        <li><code>*italic text*</code> → <em>italic text</em></li>
+                                                        <li><code>`code`</code> → <code>code</code></li>
+                                                    </ul>
+                                                    
+                                                    <strong>Lists:</strong>
+                                                    <ul class="list-unstyled ms-2 mb-2">
+                                                        <li><code>- Bullet item</code></li>
+                                                        <li><code>1. Numbered item</code></li>
+                                                        <li><code>- [ ] Unchecked box</code></li>
+                                                        <li><code>- [x] Checked box</code></li>
+                                                    </ul>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <strong>Links & Headers:</strong>
+                                                    <ul class="list-unstyled ms-2 mb-2">
+                                                        <li><code>[Link text](url)</code></li>
+                                                        <li><code>## Heading 2</code></li>
+                                                        <li><code>### Heading 3</code></li>
+                                                    </ul>
+                                                    
+                                                    <strong>Example User Story:</strong>
+                                                    <pre class="mb-0" style="font-size: 0.75rem; background-color: white; padding: 0.5rem;">As a **Product Owner**
+                        I want to create tasks
+                        So that I can track work
+                        
+                        ## Acceptance Criteria
+                        - [ ] Task has title
+                        - [ ] Task has description
+                        - [x] Form validates input</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Priority Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.priority.id_for_label }}" class="form-label">
+                                {{ form.priority.label }}
+                            </label>
+                            {{ form.priority }}
+                            {% if form.priority.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.priority.errors }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <span class="badge" style="background-color: #ff0000;">Critical</span>
+                                <span class="badge" style="background-color: #e27730;">High</span>
+                                <span class="badge" style="background-color: #ffdd00;">Medium</span>
+                                <span class="badge" style="background-color: #5ee100d0;">Low</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Story Points and Estimated Hours-->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <!-- Story Points Field -->
+                                <div class="mb-3">
+                                    <label for="{{ form.story_points.id_for_label }}" class="form-label">
+                                        {{ form.story_points.label }}
+                                    </label>
+                                    {{ form.story_points }}
+                                    {% if form.story_points.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.story_points.errors }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Estimate story points based on Fibonacci scale (1, 2, 3, 5, 8, 13)
+                                        1 point = 1 Day, 2 points = 2 Days, 3 points = 3 Days
+                                        <br>
+                                        5 points = 4 days, 8 points = 5 days, 13 points = 10 days                                         
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <!-- Estimated Hours Field -->
+                                <div class="mb-3">
+                                    <label for="{{ form.estimated_hours.id_for_label }}" class="form-label">
+                                        {{ form.estimated_hours.label }}
+                                    </label>
+                                    {{ form.estimated_hours }}
+                                    {% if form.estimated_hours.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.estimated_hours.errors }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Time estimate in hours
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Assigned To Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.assigned_to.id_for_label }}" class="form-label">
+                                {{ form.assigned_to.label }}
+                            </label>
+                            {{ form.assigned_to }}
+                            {% if form.assigned_to.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.assigned_to.errors }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Leave blank if not assigning to anyone yet.
+                            </div>
+                        </div>
+                        
+                        <!-- Form Actions -->
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Create Task
+                            </button>
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Info Box -->
+            <div class="card mt-3" style="border-left: 4px solid #378DBD;">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-info-circle text-info"></i> About Product Backlog
+                    </h6>
+                    <p class="card-text small mb-0">
+                        New tasks are automatically added to the <strong>Product Backlog</strong>. 
+                        The Scrum Master can move them to the Sprint Backlog during sprint planning.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

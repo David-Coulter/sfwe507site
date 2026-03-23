@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load markdown_extras %}
+
+{% block title %}{{ task.title }} - PDMS{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Markdown Content Styling */
+.markdown-content {
+    line-height: 1.6;
+    color: #333;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+    color: #0C234B;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.markdown-content h1 {
+    font-size: 1.75rem;
+    border-bottom: 2px solid #AB0520;
+    padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+    font-size: 1.5rem;
+    border-bottom: 1px solid #E2E9EB;
+    padding-bottom: 0.3rem;
+}
+
+.markdown-content h3 {
+    font-size: 1.25rem;
+}
+
+.markdown-content p {
+    margin-bottom: 1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+}
+
+.markdown-content li {
+    margin-bottom: 0.5rem;
+}
+
+.markdown-content a {
+    color: #1E5288;
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    color: #378DBD;
+    text-decoration: underline;
+}
+
+.markdown-content code {
+    background-color: #F4EDE5;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: #AB0520;
+}
+
+.markdown-content pre {
+    background-color: #F4EDE5;
+    padding: 1rem;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.markdown-content pre code {
+    background-color: transparent;
+    padding: 0;
+    color: #0C234B;
+}
+
+.markdown-content blockquote {
+    border-left: 4px solid #378DBD;
+    padding-left: 1rem;
+    margin-left: 0;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.markdown-content table {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-collapse: collapse;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+    padding: 0.75rem;
+    border: 1px solid #E2E9EB;
+}
+
+.markdown-content table th {
+    background-color: #0C234B;
+    color: white;
+    font-weight: 600;
+}
+
+.markdown-content table tr:nth-child(even) {
+    background-color: #E2E9EB;
+}
+
+.markdown-content hr {
+    border: 0;
+    border-top: 2px solid #E2E9EB;
+    margin: 2rem 0;
+}
+
+/* Checkboxes in lists */
+.markdown-content input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="page-title">
+                    <i class="bi bi-card-text"></i> Task Details
+                </h1>
+                <div>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Main Task Details -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-list-task"></i> {{ task.title }}</span>
+                            <span class="badge badge-priority-{{ task.priority }}">
+                                {{ task.get_priority_display }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Task Description with Markdown -->
+                            <h5 class="mb-3">Description</h5>
+                            <div class="markdown-content">
+                                {{ task.description|markdown|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Task Metadata Sidebar -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <i class="bi bi-info-circle"></i> Details
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2">
+                                <strong>Status:</strong><br>
+                                <span class="badge bg-secondary">{{ task.get_status_display }}</span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Priority:</strong><br>
+                                <span class="badge badge-priority-{{ task.priority }}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </p>
+                            {% if task.story_points %}
+                            <p class="mb-2">
+                                <strong>Story Points:</strong><br>
+                                {{ task.story_points }}
+                            </p>
+                            {% endif %}
+                            {% if task.estimated_hours %}
+                            <p class="mb-2">
+                                <strong>Estimated Hours:</strong><br>
+                                {{ task.estimated_hours }}
+                            </p>
+                            {% endif %}
+                            <p class="mb-2">
+                                <strong>Assigned To:</strong><br>
+                                {% if task.assigned_to %}
+                                    {{ task.assigned_to.username }}
+                                {% else %}
+                                    <em class="text-muted">Unassigned</em>
+                                {% endif %}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Created By:</strong><br>
+                                {{ task.created_by.username }}
+                            </p>
+                            <p class="mb-0">
+                                <strong>Created:</strong><br>
+                                {{ task.created_at|date:"M d, Y" }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
