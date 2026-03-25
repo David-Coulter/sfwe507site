@@ -75,8 +75,7 @@
                                                     <ul class="list-unstyled ms-2 mb-2">
                                                         <li><code>- Bullet item</code></li>
                                                         <li><code>1. Numbered item</code></li>
-                                                        <li><code>- [ ] Unchecked box</code></li>
-                                                        <li><code>- [x] Checked box</code></li>
+                                                        <li><code>- [ ] Check boxes</code></li>
                                                     </ul>
                                                 </div>
                                                 <div class="col-md-6">
@@ -180,13 +179,14 @@
                                 Leave blank if not assigning to anyone yet.
                             </div>
                         </div>
-                        
+
                         <!-- Form Actions -->
                         <div class="d-flex gap-2 mt-4">
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Create Task
+                                <i class="bi bi-check-circle"></i> {% if task %}Update{% else %}Create{% endif %} Task
                             </button>
-                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                            <a href="{% if task %}{% url 'task_detail' task.pk %}{% else %}{% url 'dashboard' %}{% endif %}" 
+                            class="btn btn-outline-secondary">
                                 <i class="bi bi-x-circle"></i> Cancel
                             </a>
                         </div>
