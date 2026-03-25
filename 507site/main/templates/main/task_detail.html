@@ -246,8 +246,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Helper: Rebuild markdown with current checkbox states
     function rebuildMarkdownWithCheckboxes() {
-        // This is a simplified version - you'll need the original markdown
-        // For now, just store it in a data attribute
         let originalMarkdown = '{{ task.description|escapejs }}';
         
         // Get all checkboxes and their states
