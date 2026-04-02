@@ -3,6 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Task
 from .forms import TaskForm
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
 
 
 @login_required
@@ -47,6 +50,56 @@ def create_task(request):
     }
     
     return render(request, 'main/task_form.html', context)
+
+@login_required
+def task_detail(request, pk):
+    task = Task.objects.get(pk=pk)
+    context = {
+        'task': task,
+        'page_title': 'Task Details',
+    }
+    return render(request, 'main/task_detail.html', context)
+
+@login_required
+def edit_task(request, pk):
+    task = Task.objects.get(pk=pk)
+    if request.method == 'POST':
+        form = TaskForm(request.POST, instance=task)
+        if form.is_valid():
+            updated_task = form.save(commit=False)
+            updated_task.status = task.status
+            updated_task.save()
+            messages.success(request, f'Task "{task.title}" updated successfully!')
+            return redirect('task_detail', pk=task.pk)
+    else:
+        form = TaskForm(instance=task)
+        
+    context = {
+        'form': form,
+        'task': task,
+        'page_title': 'Edit Task',
+    }
+    
+    return render(request, 'main/task_form.html', context)
+
+
+@login_required
+def update_task_description(request, pk):
+
+    if request.method == 'POST':
+        try:
+            task = Task.objects.get(pk=pk)
+            data = json.loads(request.body)
+            
+            # Update the description with new checkbox states
+            task.description = data.get('description')
+            task.save()
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 
         

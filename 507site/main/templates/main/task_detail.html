@@ -19,20 +19,10 @@
     margin-bottom: 0.75rem;
 }
 
-.markdown-content h1 {
-    font-size: 1.75rem;
-    border-bottom: 2px solid #AB0520;
-    padding-bottom: 0.5rem;
-}
-
 .markdown-content h2 {
     font-size: 1.5rem;
     border-bottom: 1px solid #E2E9EB;
     padding-bottom: 0.3rem;
-}
-
-.markdown-content h3 {
-    font-size: 1.25rem;
 }
 
 .markdown-content p {
@@ -72,54 +62,24 @@
     padding: 1rem;
     border-radius: 5px;
     overflow-x: auto;
-    margin-bottom: 1rem;
 }
 
-.markdown-content pre code {
-    background-color: transparent;
-    padding: 0;
-    color: #0C234B;
-}
-
-.markdown-content blockquote {
-    border-left: 4px solid #378DBD;
-    padding-left: 1rem;
-    margin-left: 0;
-    color: #6c757d;
-    font-style: italic;
-}
-
-.markdown-content table {
-    width: 100%;
-    margin-bottom: 1rem;
-    border-collapse: collapse;
-}
-
-.markdown-content table th,
-.markdown-content table td {
-    padding: 0.75rem;
-    border: 1px solid #E2E9EB;
-}
-
-.markdown-content table th {
-    background-color: #0C234B;
-    color: white;
-    font-weight: 600;
-}
-
-.markdown-content table tr:nth-child(even) {
-    background-color: #E2E9EB;
-}
-
-.markdown-content hr {
-    border: 0;
-    border-top: 2px solid #E2E9EB;
-    margin: 2rem 0;
-}
-
-/* Checkboxes in lists */
+/* Clickable checkboxes */
 .markdown-content input[type="checkbox"] {
     margin-right: 0.5rem;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+.markdown-content li:has(input[type="checkbox"]) {
+    list-style: none;
+}
+
+/* Checked items get strikethrough */
+.markdown-content input[type="checkbox"]:checked + * {
+    text-decoration: line-through;
+    color: #6c757d;
 }
 </style>
 {% endblock %}
@@ -134,6 +94,9 @@
                     <i class="bi bi-card-text"></i> Task Details
                 </h1>
                 <div>
+                    <a href="{% url 'edit_task' task.pk %}" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i> Edit Task
+                    </a>
                     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>
@@ -153,9 +116,14 @@
                         <div class="card-body">
                             <!-- Task Description with Markdown -->
                             <h5 class="mb-3">Description</h5>
-                            <div class="markdown-content">
+                            <div class="markdown-content" id="task-description" data-task-id="{{ task.pk }}">
                                 {{ task.description|markdown|safe }}
                             </div>
+                            
+                            <!-- Save Button (appears after checking boxes) -->
+                            <button id="save-checkboxes" class="btn btn-sm btn-success mt-3" style="display: none;">
+                                <i class="bi bi-check-circle"></i> Update checkboxes
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -205,6 +173,10 @@
                                 <strong>Created:</strong><br>
                                 {{ task.created_at|date:"M d, Y" }}
                             </p>
+                            <p class="mb-2">
+                                <strong>Last Updated:</strong><br>
+                                {{ task.updated_at|date:"M d, Y" }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -212,4 +184,104 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const descriptionDiv = document.getElementById('task-description');
+    const saveButton = document.getElementById('save-checkboxes');
+    const checkboxes = descriptionDiv.querySelectorAll('input[type="checkbox"]');
+    
+    // Store original state
+    let hasChanges = false;
+    
+    // Listen for checkbox changes
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            hasChanges = true;
+            saveButton.style.display = 'inline-block';
+        });
+    });
+    
+    // Save checkbox state
+    saveButton.addEventListener('click', function() {
+        // Get current markdown from description
+        const taskId = descriptionDiv.getAttribute('data-task-id');
+        
+        // Rebuild markdown with updated checkbox states
+        const updatedMarkdown = rebuildMarkdownWithCheckboxes();
+        
+        // Send AJAX request to update task
+        fetch(`/task/${taskId}/update-description/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                description: updatedMarkdown
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                saveButton.style.display = 'none';
+                hasChanges = false;
+                
+                // Show success message
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success alert-dismissible fade show';
+                alert.innerHTML = `
+                    <i class="bi bi-check-circle"></i> Checkboxes updated!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                descriptionDiv.parentElement.insertBefore(alert, descriptionDiv);
+                
+                // Auto-dismiss after 3 seconds
+                setTimeout(() => alert.remove(), 3000);
+            }
+        });
+    });
+    
+    // Helper: Rebuild markdown with current checkbox states
+    function rebuildMarkdownWithCheckboxes() {
+        let originalMarkdown = '{{ task.description|escapejs }}';
+        
+        // Get all checkboxes and their states
+        checkboxes.forEach((checkbox, index) => {
+            const isChecked = checkbox.checked;
+            const checkboxPattern = /- \[([ x])\]/g;
+            let count = 0;
+            
+            originalMarkdown = originalMarkdown.replace(checkboxPattern, (match) => {
+                if (count === index) {
+                    count++;
+                    return isChecked ? '- [x]' : '- [ ]';
+                }
+                count++;
+                return match;
+            });
+        });
+        
+        return originalMarkdown;
+    }
+    
+    // Helper: Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
 {% endblock %}
