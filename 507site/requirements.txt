@@ -1,5 +1,2 @@
-# Core Framework
-Django>=4.2,<5.0
-
-# Markdown Support for Task Descriptions
+Django>=5.2,<5.3
 markdown>=3.4.0

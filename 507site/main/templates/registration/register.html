@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5" style="max-width: 500px;">
+    <h3>Create Account</h3>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        {{ form.as_p }}
+
+        <button type="submit" class="btn btn-primary w-100">
+            Register
+        </button>
+    </form>
+
+    <div class="mt-3 text-center">
+        <a href="{% url 'login' %}">Back to Login</a>
+    </div>
+</div>
+{% endblock %}

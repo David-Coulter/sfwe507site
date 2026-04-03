@@ -2,10 +2,25 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Task, Comment
-from .forms import TaskForm, CommentForm
+from .forms import TaskForm, CommentForm, RegisterForm
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 import json
+
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Account created successfully. Please log in.')
+            return redirect('login')
+    else:
+        form = RegisterForm()
+
+    return render(request, 'registration/register.html', {'form': form})
 
 
 @login_required
@@ -29,6 +44,7 @@ def dashboard(request):
     }
     return render(request, 'main/dashboard.html', context)
 
+
 @login_required
 def create_task(request):
     if request.method == 'POST':
@@ -42,7 +58,7 @@ def create_task(request):
             messages.success(request, f'Task "{task.title}" created successfully!')
             return redirect('dashboard')
     else:
-            form = TaskForm()
+        form = TaskForm()
         
     context = {
         'form': form,
@@ -50,6 +66,7 @@ def create_task(request):
     }
     
     return render(request, 'main/task_form.html', context)
+
 
 @login_required
 def task_detail(request, pk):
@@ -75,6 +92,7 @@ def task_detail(request, pk):
         'comments': comments
     }
     return render(request, 'main/task_detail.html', context)
+
 
 @login_required
 def edit_task(request, pk):
@@ -107,7 +125,6 @@ def update_task_description(request, pk):
             task = Task.objects.get(pk=pk)
             data = json.loads(request.body)
             
-            # Update the description with new checkbox states
             task.description = data.get('description')
             task.save()
             
@@ -116,6 +133,3 @@ def update_task_description(request, pk):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request'})
-
-
-        
