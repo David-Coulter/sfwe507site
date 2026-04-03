@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Task
-from .forms import TaskForm
+from .models import Task, Comment
+from .forms import TaskForm, CommentForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -54,9 +54,25 @@ def create_task(request):
 @login_required
 def task_detail(request, pk):
     task = Task.objects.get(pk=pk)
+    if request.method == 'POST':
+        comment_form = CommentForm(request.POST)
+        if comment_form.is_valid():
+            comment = comment_form.save(commit=False)
+            comment.task = task
+            comment.author = request.user
+            comment.save()
+            
+            messages.success(request, 'Comment added!')
+            return redirect('task_detail', pk=task.pk)
+    else:
+        comment_form = CommentForm()
+    
+    comments = task.comments.all()
     context = {
         'task': task,
         'page_title': 'Task Details',
+        'comment_form': comment_form,
+        'comments': comments
     }
     return render(request, 'main/task_detail.html', context)
 

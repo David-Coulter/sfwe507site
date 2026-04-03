@@ -61,3 +61,15 @@ class Task(models.Model):
     
     def __str__(self):
         return f"{self.title} [{self.get_status_display()}]"
+    
+class Comment(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField(max_length=1000, help_text="Maximum 1000 characters")
+    created_at = models.DateTimeField(auto_now_add=True)
+        
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.author.username} commented on {self.task.title} at {self.created_at}"

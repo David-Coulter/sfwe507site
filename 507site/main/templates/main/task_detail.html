@@ -11,18 +11,13 @@
     color: #333;
 }
 
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3 {
-    color: #0C234B;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-}
-
 .markdown-content h2 {
     font-size: 1.5rem;
     border-bottom: 1px solid #E2E9EB;
     padding-bottom: 0.3rem;
+    color: #0C234B;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
 }
 
 .markdown-content p {
@@ -64,7 +59,6 @@
     overflow-x: auto;
 }
 
-/* Clickable checkboxes */
 .markdown-content input[type="checkbox"] {
     margin-right: 0.5rem;
     cursor: pointer;
@@ -72,14 +66,49 @@
     height: 18px;
 }
 
-.markdown-content li:has(input[type="checkbox"]) {
-    list-style: none;
-}
-
-/* Checked items get strikethrough */
 .markdown-content input[type="checkbox"]:checked + * {
     text-decoration: line-through;
     color: #6c757d;
+}
+
+/* Comment Styles */
+.comment-item {
+    border-left: 3px solid #378DBD;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #F4EDE5;
+    border-radius: 5px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.comment-author {
+    font-weight: 600;
+    color: #0C234B;
+}
+
+.comment-date {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.comment-text {
+    color: #333;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.no-comments {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-style: italic;
 }
 </style>
 {% endblock %}
@@ -106,6 +135,7 @@
             <div class="row">
                 <!-- Main Task Details -->
                 <div class="col-lg-8">
+                    <!-- Task Description Card -->
                     <div class="card shadow-sm mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-list-task"></i> {{ task.title }}</span>
@@ -114,16 +144,59 @@
                             </span>
                         </div>
                         <div class="card-body">
-                            <!-- Task Description with Markdown -->
                             <h5 class="mb-3">Description</h5>
                             <div class="markdown-content" id="task-description" data-task-id="{{ task.pk }}">
                                 {{ task.description|markdown|safe }}
                             </div>
                             
-                            <!-- Save Button (appears after checking boxes) -->
                             <button id="save-checkboxes" class="btn btn-sm btn-success mt-3" style="display: none;">
-                                <i class="bi bi-check-circle"></i> Update checkboxes
+                                <i class="bi bi-check-circle"></i> Save Checkbox Changes
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Comments Section -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <i class="bi bi-chat-left-text"></i> Comments ({{ comments.count }})
+                        </div>
+                        <div class="card-body">
+                            <!-- Existing Comments -->
+                            {% if comments %}
+                                {% for comment in comments %}
+                                <div class="comment-item">
+                                    <div class="comment-header">
+                                        <span class="comment-author">
+                                            <i class="bi bi-person-circle"></i> {{ comment.author.username }}
+                                        </span>
+                                        <span class="comment-date">
+                                            {{ comment.created_at|date:"M d, Y g:i A" }}
+                                        </span>
+                                    </div>
+                                    <div class="comment-text">{{ comment.text }}</div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="no-comments">
+                                    <i class="bi bi-chat" style="font-size: 3rem; color: #0C234B;"></i>
+                                    <p class="mt-2">No comments yet. Be the first to comment!</p>
+                                </div>
+                            {% endif %}
+
+                            <!-- Add Comment Form -->
+                            <div class="mt-4">
+                                <h6 class="mb-3"><i class="bi bi-plus-circle"></i> Add a Comment</h6>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    {{ comment_form.text }}
+                                    <div class="form-text mb-2">
+                                        Maximum 1000 characters. Comments cannot be edited or deleted.
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-send"></i> Post Comment
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -169,13 +242,13 @@
                                 <strong>Created By:</strong><br>
                                 {{ task.created_by.username }}
                             </p>
-                            <p class="mb-0">
+                            <p class="mb-2">
                                 <strong>Created:</strong><br>
                                 {{ task.created_at|date:"M d, Y" }}
                             </p>
-                            <p class="mb-2">
+                            <p class="mb-0">
                                 <strong>Last Updated:</strong><br>
-                                {{ task.updated_at|date:"M d, Y" }}
+                                {{ task.updated_at|date:"M d, Y g:i A" }}
                             </p>
                         </div>
                     </div>
@@ -193,10 +266,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveButton = document.getElementById('save-checkboxes');
     const checkboxes = descriptionDiv.querySelectorAll('input[type="checkbox"]');
     
-    // Store original state
     let hasChanges = false;
     
-    // Listen for checkbox changes
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             hasChanges = true;
@@ -204,15 +275,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Save checkbox state
     saveButton.addEventListener('click', function() {
-        // Get current markdown from description
         const taskId = descriptionDiv.getAttribute('data-task-id');
-        
-        // Rebuild markdown with updated checkbox states
         const updatedMarkdown = rebuildMarkdownWithCheckboxes();
         
-        // Send AJAX request to update task
         fetch(`/task/${taskId}/update-description/`, {
             method: 'POST',
             headers: {
@@ -229,26 +295,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveButton.style.display = 'none';
                 hasChanges = false;
                 
-                // Show success message
                 const alert = document.createElement('div');
                 alert.className = 'alert alert-success alert-dismissible fade show';
                 alert.innerHTML = `
-                    <i class="bi bi-check-circle"></i> Checkboxes updated!
+                    <i class="bi bi-check-circle"></i> Checkboxes saved!
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 descriptionDiv.parentElement.insertBefore(alert, descriptionDiv);
                 
-                // Auto-dismiss after 3 seconds
                 setTimeout(() => alert.remove(), 3000);
             }
         });
     });
     
-    // Helper: Rebuild markdown with current checkbox states
     function rebuildMarkdownWithCheckboxes() {
         let originalMarkdown = '{{ task.description|escapejs }}';
         
-        // Get all checkboxes and their states
         checkboxes.forEach((checkbox, index) => {
             const isChecked = checkbox.checked;
             const checkboxPattern = /- \[([ x])\]/g;
@@ -267,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return originalMarkdown;
     }
     
-    // Helper: Get CSRF token
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
