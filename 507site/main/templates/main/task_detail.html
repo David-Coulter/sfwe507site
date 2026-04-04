@@ -218,6 +218,14 @@
                                     {{ task.get_priority_display }}
                                 </span>
                             </p>
+                            {% if task.sprint %}
+                            <p class="mb-2">
+                                <strong>Sprint:</strong><br>
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-calendar-check"></i> {{ task.sprint.name }}
+                                </span>
+                            </p>
+                            {% endif %}
                             {% if task.story_points %}
                             <p class="mb-2">
                                 <strong>Story Points:</strong><br>

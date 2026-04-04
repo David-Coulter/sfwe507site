@@ -21,10 +21,11 @@ class Task(models.Model):
         (3, 'Medium'),
         (4, 'Low'),
     ]
+
     SPRINT_STATUS = [
         ('NOT_STARTED', 'Not Started'),
-        ('IN_PROGRESS', 'In Progress'),
-        ('IN_REVIEW', 'In Review'),
+        ('PLANNING', 'Planning'),
+        ('ACTIVE', 'Active'),
         ('COMPLETED', 'Completed'),
     ]
     
@@ -92,8 +93,8 @@ class Sprint (models.Model):
 
     SPRINT_STATUS = [
         ('NOT_STARTED', 'Not Started'),
-        ('IN_PROGRESS', 'In Progress'),
-        ('IN_REVIEW', 'In Review'),
+        ('PLANNING', 'Planning'),
+        ('ACTIVE', 'Active'),
         ('COMPLETED', 'Completed'),
     ]
     name = models.CharField(max_length=100)

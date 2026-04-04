@@ -91,8 +91,13 @@
                                         {% for sprint in sprints %}
                                         <li>
                                             <a class="dropdown-item" 
-                                               href="{% url 'move_to_sprint' task.pk sprint.pk %}">
-                                                {{ sprint.name }}
+                                                href="{% url 'move_to_sprint' task.pk sprint.pk %}">
+                                                    {{ sprint.name }}
+                                                    {% if sprint.status == 'ACTIVE' %}
+                                                        <span class="badge bg-success">Active</span>
+                                                    {% else %}
+                                                        <span class="badge bg-info">Planning</span>
+                                                    {% endif %}
                                             </a>
                                         </li>
                                         {% endfor %}
