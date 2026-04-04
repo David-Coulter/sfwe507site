@@ -103,8 +103,9 @@ def edit_task(request, pk):
             updated_task = form.save(commit=False)
             updated_task.status = task.status
             updated_task.save()
-            messages.success(request, f'Task "{task.title}" updated successfully!')
-            return redirect('task_detail', pk=task.pk)
+            form.save_m2m()
+        messages.success(request, f'Task "{task.title}" updated successfully!')
+        return redirect('task_detail', pk=task.pk)
     else:
         form = TaskForm(instance=task)
         
