@@ -21,6 +21,12 @@ class Task(models.Model):
         (3, 'Medium'),
         (4, 'Low'),
     ]
+    SPRINT_STATUS = [
+        ('NOT_STARTED', 'Not Started'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('IN_REVIEW', 'In Review'),
+        ('COMPLETED', 'Completed'),
+    ]
     
     # Basic Information
     title = models.CharField(max_length=200)
@@ -55,7 +61,15 @@ class Task(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+    # Sprint Progress
+    sprint = models.ForeignKey(
+        'Sprint',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tasks'
+    )
     class Meta:
         ordering = ['priority', '-created_at']
     
@@ -73,3 +87,38 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"{self.author.username} commented on {self.task.title} at {self.created_at}"
+
+class Sprint (models.Model):
+
+    SPRINT_STATUS = [
+        ('NOT_STARTED', 'Not Started'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('IN_REVIEW', 'In Review'),
+        ('COMPLETED', 'Completed'),
+    ]
+    name = models.CharField(max_length=100)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    goal = models.TextField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Task.SPRINT_STATUS,
+        default='NOT_STARTED'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.name
+    
+    @property
+    def task_count(self):
+        return self.tasks.count()
+    
+    @property
+    def completed_tasks(self):
+        return self.task_set.filter(status='COMPLETE').count()
+    

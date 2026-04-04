@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Task, Comment
+from .models import Task, Comment, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm
 from django.http import JsonResponse
 import json
@@ -134,3 +134,31 @@ def update_task_description(request, pk):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+@login_required
+def product_backlog(request):
+    # Retrieve tasks and sprints
+    backlog_tasks = Task.objects.filter(status='BACKLOG').order_by('priority', '-created_at')
+    sprints = Sprint.objects.filter(status__in=['PLANNING', 'ACTIVE']).order_by('-created_at')
+    
+    context = {
+        'backlog_tasks': backlog_tasks,
+        'sprints': sprints,
+        'total_story_points': sum(t.story_points for t in backlog_tasks),
+    }
+    
+    return render(request, 'main/product_backlog.html', context)
+
+@login_required
+def move_to_sprint(request, task_pk, sprint_pk):
+    # Move task to sprint
+    task = Task.objects.get(pk=task_pk)
+    sprint = Sprint.objects.get(pk=sprint_pk)
+    
+    task.sprint = sprint
+    task.status = 'SPRINT'
+    task.save()
+    
+    messages.success(request, f'Task "{task.title}" moved to {sprint.name}!')
+    
+    return redirect('product_backlog')

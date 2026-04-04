@@ -20,7 +20,7 @@
                     <div class="stat-label">
                         <i class="bi bi-list-ul"></i> Product Backlog
                     </div>
-                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #007D84; color: #007D84;">View All</a>
+                    <a href="{% url 'product_backlog' %}" class="btn btn-sm mt-3" style="border: 1px solid #007D84; color: #007D84;">View All</a>
                 </div>
             </div>
         </div>
@@ -83,7 +83,7 @@
                         <a href="{% url 'create_task' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> Create New Task
                         </a>
-                        <a href="#" class="btn btn-outline-secondary">
+                        <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-list-ul"></i> View Product Backlog
                         </a>
                         <a href="#" class="btn btn-outline-secondary">
