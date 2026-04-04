@@ -139,7 +139,10 @@ def update_task_description(request, pk):
 def product_backlog(request):
     # Retrieve tasks and sprints
     backlog_tasks = Task.objects.filter(status='BACKLOG').order_by('priority', '-created_at')
-    sprints = Sprint.objects.filter(status__in=['PLANNING', 'ACTIVE']).order_by('-created_at')
+
+    active_sprints = Sprint.objects.filter(status='ACTIVE').order_by('name')
+    planning_sprints = Sprint.objects.filter(status='PLANNING').order_by('name')
+    sprints = list(active_sprints) + list(planning_sprints)
     
     context = {
         'backlog_tasks': backlog_tasks,
@@ -154,7 +157,13 @@ def move_to_sprint(request, task_pk, sprint_pk):
     # Move task to sprint
     task = Task.objects.get(pk=task_pk)
     sprint = Sprint.objects.get(pk=sprint_pk)
+
+    # Check if task is already in a sprint
+    if task.sprint and task.sprint.status in ['PLANNING', 'ACTIVE']:
+        messages.error(request, f'Task "{task.title}" is already assigned to {task.sprint.name}!')
+        return redirect('product_backlog')
     
+    # Move task to sprint
     task.sprint = sprint
     task.status = 'SPRINT'
     task.save()
