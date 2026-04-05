@@ -22,7 +22,7 @@ A Django-based Agile project management system for tracking tasks through a comp
 
 ## Tech Stack
 
-- **Backend:** Django 4.2+
+- **Backend:** Django 5.2+
 - **Database:** SQLite (development)
 - **Frontend:** Bootstrap 5, Bootstrap Icons
 - **Styling:** University of Arizona brand colors
