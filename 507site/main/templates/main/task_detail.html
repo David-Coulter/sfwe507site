@@ -221,9 +221,12 @@
                             {% if task.sprint %}
                             <p class="mb-2">
                                 <strong>Sprint:</strong><br>
-                                <span class="badge bg-primary">
-                                    <i class="bi bi-calendar-check"></i> {{ task.sprint.name }}
-                                </span>
+                                <a href="{% url 'sprint_board' task.sprint.pk %}" class="text-decoration-none">
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-calendar-check"></i> {{ task.sprint.name }}
+                                    </span>
+                                </a>
+                                <small class="d-block text-muted">{{ task.sprint.get_status_display }}</small>
                             </p>
                             {% endif %}
                             {% if task.story_points %}

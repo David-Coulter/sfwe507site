@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Sprints - PDMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-calendar3"></i> Sprints
+        </h1>
+        <div>
+            <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-inbox"></i> Backlog
+            </a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-house"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    {% if sprints %}
+    <!-- Sprints List -->
+    <div class="row">
+        {% for sprint in sprints %}
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>{{ sprint.name }}</strong>
+                    <span class="badge bg-{{ sprint.status|lower }}">
+                        {{ sprint.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if sprint.start_date and sprint.end_date %}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-calendar"></i> 
+                        {{ sprint.start_date|date:"M d" }} - {{ sprint.end_date|date:"M d, Y" }}
+                    </p>
+                    {% endif %}
+                    
+                    {% if sprint.goal %}
+                    <p class="small mb-3">{{ sprint.goal|truncatewords:15 }}</p>
+                    {% endif %}
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 class="mb-0">{{ sprint.task_count }}</h4>
+                            <small class="text-muted">Tasks</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="mb-0">{{ sprint.completed_task_count }}</h4>
+                            <small class="text-muted">Done</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'sprint_board' sprint.pk %}" class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-kanban"></i> View Sprint Board
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-calendar-x" style="font-size: 4rem; color: #0C234B;"></i>
+            <h3 class="mt-3">No Sprints Yet</h3>
+            <p class="text-muted">
+                Create a sprint in the admin panel to get started.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge.bg-planning {
+    background-color: #0C234B !important;
+}
+.badge.bg-active {
+    background-color: #1E5288 !important;
+}
+.badge.bg-complete {
+    background-color: #6c757d !important;
+}
+</style>
+{% endblock %}
