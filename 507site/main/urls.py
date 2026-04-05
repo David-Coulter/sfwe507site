@@ -9,5 +9,7 @@ urlpatterns = [
     path('task/create/', views.create_task, name='create_task'),
     path('task/<int:pk>/update-description/', views.update_task_description, name='update_task_description'),
     path('backlog/', views.product_backlog, name='product_backlog'),
+    path('sprint_<int:sprint_pk>/board/', views.sprint_board, name='sprint_board'),
+    path('sprints/', views.sprint_list, name='sprint_list'),
     path('task/<int:task_pk>/move-to-sprint/<int:sprint_pk>/', views.move_to_sprint, name='move_to_sprint'),
 ]

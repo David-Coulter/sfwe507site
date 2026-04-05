@@ -153,6 +153,37 @@ def product_backlog(request):
     return render(request, 'main/product_backlog.html', context)
 
 @login_required
+def sprint_board(request, sprint_pk):
+    sprint = Sprint.objects.get(pk=sprint_pk)
+    sprint_tasks_qs = Task.objects.filter(sprint=sprint).order_by('priority', '-created_at')
+    sprint_tasks = list(sprint_tasks_qs)
+    
+    total_story_points = sum(t.story_points for t in sprint_tasks)
+    completed_tasks = [t for t in sprint_tasks if t.status == 'COMPLETE']
+    completed_story_points = sum(t.story_points for t in completed_tasks)
+
+    context = {
+        'sprint': sprint,
+        'sprint_tasks': sprint_tasks,
+        'total_story_points': total_story_points,
+        'completed_story_points': completed_story_points,
+        'total_tasks': len(sprint_tasks), 
+        'completed_tasks': len(completed_tasks),
+    }
+    
+    return render(request, 'main/sprint_board.html', context)
+
+@login_required
+def sprint_list(request):
+    sprints = Sprint.objects.all().order_by('-created_at')
+
+    context = {
+        'sprints': sprints,
+    }
+
+    return render(request, 'main/sprint_list.html', context)
+
+@login_required
 def move_to_sprint(request, task_pk, sprint_pk):
     # Move task to sprint
     task = Task.objects.get(pk=task_pk)

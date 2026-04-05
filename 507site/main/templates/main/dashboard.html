@@ -35,7 +35,7 @@
                     <div class="stat-label">
                         <i class="bi bi-calendar-week"></i> Sprint Backlog
                     </div>
-                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #81D3EB; color: #81D3EB;">View All</a>
+                    <a href="{% url 'sprint_list' %}" class="btn btn-sm mt-3" style="border: 1px solid #81D3EB; color: #81D3EB;">View All</a>
                 </div>
             </div>
         </div>
@@ -86,7 +86,7 @@
                         <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-list-ul"></i> View Product Backlog
                         </a>
-                        <a href="#" class="btn btn-outline-secondary">
+                        <a href="{% url 'sprint_list' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-calendar-week"></i> View Sprint Backlog
                         </a>
                         <a href="#" class="btn btn-outline-secondary">
