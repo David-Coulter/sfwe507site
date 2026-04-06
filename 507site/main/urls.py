@@ -12,4 +12,5 @@ urlpatterns = [
     path('sprint_<int:sprint_pk>/board/', views.sprint_board, name='sprint_board'),
     path('sprints/', views.sprint_list, name='sprint_list'),
     path('task/<int:task_pk>/move-to-sprint/<int:sprint_pk>/', views.move_to_sprint, name='move_to_sprint'),
+    path('task/<int:task_pk>/sprint-progress/<str:new_progress>/', views.update_sprint_progress, name='update_sprint_progress'),
 ]

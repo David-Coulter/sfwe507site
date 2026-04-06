@@ -22,12 +22,15 @@ class Task(models.Model):
         (4, 'Low'),
     ]
 
-    SPRINT_STATUS = [
-        ('NOT_STARTED', 'Not Started'),
-        ('PLANNING', 'Planning'),
-        ('ACTIVE', 'Active'),
-        ('COMPLETED', 'Completed'),
-    ]
+    sprint_progress = models.CharField(
+        max_length=20, choices=[
+            ('NOT_STARTED', 'Not Started'),
+            ('IN_PROGRESS', 'In Progress'),
+            ('IN_REVIEW', 'In Review'),
+            ('DONE', 'Done'),
+    ],
+    blank=True, null=True, help_text="Progress of the task in the sprint"
+    )
     
     # Basic Information
     title = models.CharField(max_length=200)
@@ -103,7 +106,7 @@ class Sprint (models.Model):
     goal = models.TextField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
-        choices=Task.SPRINT_STATUS,
+        choices=SPRINT_STATUS,
         default='NOT_STARTED'
     )
     created_at = models.DateTimeField(auto_now_add=True)

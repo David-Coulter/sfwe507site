@@ -179,6 +179,16 @@
                                 Leave blank if not assigning to anyone yet.
                             </div>
                         </div>
+                        
+                        <!-- Sprint Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.sprint.id_for_label }}" class="form-label">Sprint</label>
+                            {{ form.sprint }}
+                            {% if form.sprint.errors %}
+                                <div class="text-danger">{{ form.sprint.errors }}</div>
+                            {% endif %}
+                            <small class="form-text text-muted">Assign this task to a sprint (optional)</small>
+                        </div>
 
                         <!-- Form Actions -->
                         <div class="d-flex gap-2 mt-4">

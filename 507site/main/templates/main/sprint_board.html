@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ sprint.name }} - PDMS{% endblock %}
+{% block title %}{{ sprint.name }} - Sprint Board{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <!-- Sprint Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -18,7 +18,7 @@
             </p>
         </div>
         <div>
-            <a href="{% url 'sprint_list' %}" class="btn btn-outline-secondary">
+            <a href ="{% url 'sprint_list' %}" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar3"></i> Sprint Backlog
             </a>
             <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
@@ -34,7 +34,7 @@
     {% if sprint.goal %}
     <div class="card shadow-sm mb-3">
         <div class="card-body">
-            <h6 class="text-muted mb-2">Sprint Goal</h6>
+            <h5 class="text-muted mb-2">Sprint Goal</h6>
             <p class="mb-0">{{ sprint.goal }}</p>
         </div>
     </div>
@@ -46,7 +46,7 @@
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h3 class="mb-0">{{ total_tasks }}</h3>
-                    <small class="text-muted">Total Tasks</small>
+                    <medium class="text-muted">Total Sprint Tasks</medium>
                 </div>
             </div>
         </div>
@@ -54,7 +54,7 @@
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h3 class="mb-0">{{ completed_tasks }}</h3>
-                    <small class="text-muted">Completed</small>
+                    <medium class="text-muted">Sprint Tasks Completed</medium>
                 </div>
             </div>
         </div>
@@ -62,7 +62,7 @@
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h3 class="mb-0">{{ total_story_points }}</h3>
-                    <small class="text-muted">Story Points</small>
+                    <medium class="text-muted">Total Sprint Story Points</medium>
                 </div>
             </div>
         </div>
@@ -70,86 +70,324 @@
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h3 class="mb-0">{{ completed_story_points }}</h3>
-                    <small class="text-muted">Points Done</small>
+                    <medium class="text-muted">Sprint Points Done</medium>
                 </div>
             </div>
         </div>
     </div>
 
     {% if total_tasks > 0 %}
-    <!-- Sprint Tasks Table -->
-    <div class="card shadow-sm">
-        <div class="card-header">
-            <i class="bi bi-list-task"></i> Sprint Tasks ({{ total_tasks }})
-        </div>
-        <div class="card-body">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th style="width: 50%;">Task</th>
-                        <th>Status</th>
-                        <th>Priority</th>
-                        <th>Story Points</th>
-                        <th>Assigned To</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for task in sprint_tasks %}
-                    <tr>
-                        <td>
-                            <a href="{% url 'task_detail' task.pk %}" class="text-decoration-none">
-                                <strong>{{ task.title }}</strong>
-                            </a>
-                            <br>
-                            <small class="text-muted">
-                                Created {{ task.created_at|date:"M d, Y" }}
-                            </small>
-                        </td>
-                        <td>
-                            <span class="badge 
-                                {% if task.status == 'COMPLETE' %}bg-success
-                                {% elif task.status == 'TESTING' %}bg-warning
-                                {% elif task.status == 'FAILED' %}bg-danger
-                                {% else %}bg-secondary
-                                {% endif %}">
-                                {{ task.get_status_display }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge badge-priority-{{ task.priority }}">
-                                {{ task.get_priority_display }}
-                            </span>
-                        </td>
-                        <td>{{ task.story_points }}</td>
-                        <td>
-                            {% if task.assigned_to %}
-                                {{ task.assigned_to.username }}
-                            {% else %}
-                                <em class="text-muted">Unassigned</em>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group" role="group">
-                                <a href="{% url 'task_detail' task.pk %}" 
-                                class="btn btn-sm btn-outline-primary"
-                                title="View Details">
-                                    <i class="bi bi-eye"></i>
+    <!-- Kanban Board -->
+    <div class="row flex-nowrap">
+        <!-- Not Started Column -->
+        <div class="col-md-3" style="flex: 0 0 25%; max-width: 25%;">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-circle"></i> Not Started</span>
+                    <span class="badge bg-light text-dark">{{ not_started_tasks|length }}</span>
+                    <span class="badge bg-light text-dark ms-1">{{ not_started_points }} pts</span>
+                </div>
+                <div class="card-body kanban-column" style="min-height: 400px;">
+                    {% for task in not_started_tasks %}
+                    <div class="card mb-2 task-card">
+                        <div class="card-body p-3">
+                            <h6 class="card-title mb-0 flex-grow-1">
+                                <a href="{% url 'task_detail' task.pk %}" style="color: #0C234B; text-decoration: underline;">
+                                    {{ task.title }}
                                 </a>
-                                <a href="{% url 'edit_task' task.pk %}" 
-                                class="btn btn-sm btn-outline-secondary"
-                                title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary p-1" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown"
+                                        title="Move task">
+                                    <i class="bi bi-arrow-left-right"></i>Move Task
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% if task.sprint_progress != 'NOT_STARTED' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'NOT_STARTED' %}">
+                                            <i class="bi bi-circle text-secondary"></i> Not Started
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_PROGRESS' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}">
+                                            <i class="bi bi-arrow-repeat text-info"></i> In Progress
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_REVIEW' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_REVIEW' %}">
+                                            <i class="bi bi-eye text-warning"></i> In Review
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'DONE' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'DONE' %}">
+                                            <i class="bi bi-check-circle text-success"></i> Done
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
                             </div>
-                        </td>
-                    </tr>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge badge-priority-{{ task.priority }}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                                <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                            </div>
+                            {% if task.assigned_to %}
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                            </small>
+                            {% else %}
+                            <small class="text-muted">Unassigned</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center mt-4">No tasks</p>
                     {% endfor %}
-                </tbody>
-            </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- In Progress Column -->
+        <div class="col-md-3" style="flex: 0 0 25%; max-width: 25%;">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-arrow-repeat"></i> In Progress</span>
+                    <span class="badge bg-light text-dark">{{ in_progress_tasks|length }} tasks</span>
+                    <span class="badge bg-light text-dark ms-1">{{ in_progress_points }} story pt(s)</span>
+                </div>
+                <div class="card-body kanban-column" style="min-height: 400px;">
+                    {% for task in in_progress_tasks %}
+                    <div class="card mb-2 task-card">
+                        <div class="card-body p-3">
+                            <h6 class="card-title mb-0 flex-grow-1">
+                                <a href="{% url 'task_detail' task.pk %}" style="color: #0C234B; text-decoration: underline;">
+                                    {{ task.title }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary p-1" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown"
+                                        title="Move task">
+                                    <i class="bi bi-arrow-left-right"></i>Move Task
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% if task.sprint_progress != 'NOT_STARTED' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'NOT_STARTED' %}">
+                                            <i class="bi bi-circle text-secondary"></i> Not Started
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_PROGRESS' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}">
+                                            <i class="bi bi-arrow-repeat text-info"></i> In Progress
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_REVIEW' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_REVIEW' %}">
+                                            <i class="bi bi-eye text-warning"></i> In Review
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'DONE' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'DONE' %}">
+                                            <i class="bi bi-check-circle text-success"></i> Done
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge badge-priority-{{ task.priority }}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                                <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                            </div>
+                            {% if task.assigned_to %}
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                            </small>
+                            {% else %}
+                            <small class="text-muted">Unassigned</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center mt-4">No tasks</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- In Review Column -->
+        <div class="col-md-3" style="flex: 0 0 25%; max-width: 25%;">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-eye"></i> In Review</span>
+                    <span class="badge bg-light text-dark">{{ in_review_tasks|length }}</span>
+                    <span class="badge bg-light text-dark ms-1">{{ in_review_points }} pts</span>
+                </div>
+                <div class="card-body kanban-column" style="min-height: 400px;">
+                    {% for task in in_review_tasks %}
+                    <div class="card mb-2 task-card">
+                        <div class="card-body p-3">
+                            <h6 class="card-title mb-0 flex-grow-1">
+                                <a href="{% url 'task_detail' task.pk %}" style="color: #0C234B; text-decoration: underline;">
+                                    {{ task.title }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary p-1" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown"
+                                        title="Move task">
+                                    <i class="bi bi-arrow-left-right"></i>Move Task
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% if task.sprint_progress != 'NOT_STARTED' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'NOT_STARTED' %}">
+                                            <i class="bi bi-circle text-secondary"></i> Not Started
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_PROGRESS' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}">
+                                            <i class="bi bi-arrow-repeat text-info"></i> In Progress
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_REVIEW' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_REVIEW' %}">
+                                            <i class="bi bi-eye text-warning"></i> In Review
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'DONE' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'DONE' %}">
+                                            <i class="bi bi-check-circle text-success"></i> Done
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge badge-priority-{{ task.priority }}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                                <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                            </div>
+                            {% if task.assigned_to %}
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                            </small>
+                            {% else %}
+                            <small class="text-muted">Unassigned</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center mt-4">No tasks</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Done Column -->
+        <div class="col-md-3" style="flex: 0 0 25%; max-width: 25%;">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check-circle"></i> Done</span>
+                    <span class="badge bg-light text-dark">{{ done_tasks|length }}</span>
+                    <span class="badge bg-light text-dark ms-1">{{ done_points }} pts</span>
+                </div>
+                <div class="card-body kanban-column" style="min-height: 400px;">
+                    {% for task in done_tasks %}
+                    <div class="card mb-2 task-card">
+                        <div class="card-body p-3">
+                            <h6 class="card-title mb-0 flex-grow-1">
+                                <a href="{% url 'task_detail' task.pk %}" style="color: #0C234B; text-decoration: underline;">
+                                    {{ task.title }}
+                                </a>
+                            </h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary p-1" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown"
+                                        title="Move task">
+                                    <i class="bi bi-arrow-left-right"></i>Move Task
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% if task.sprint_progress != 'NOT_STARTED' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'NOT_STARTED' %}">
+                                            <i class="bi bi-circle text-secondary"></i> Not Started
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_PROGRESS' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}">
+                                            <i class="bi bi-arrow-repeat text-info"></i> In Progress
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'IN_REVIEW' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'IN_REVIEW' %}">
+                                            <i class="bi bi-eye text-warning"></i> In Review
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    {% if task.sprint_progress != 'DONE' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'update_sprint_progress' task.pk 'DONE' %}">
+                                            <i class="bi bi-check-circle text-success"></i> Done
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge badge-priority-{{ task.priority }}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                                <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                            </div>
+                            {% if task.assigned_to %}
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                            </small>
+                            {% else %}
+                            <small class="text-muted">Unassigned</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center mt-4">No tasks</p>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
-
+    
     {% else %}
     <!-- Empty State -->
     <div class="card shadow-sm">
@@ -178,6 +416,35 @@
 }
 .badge.bg-complete {
     background-color: #6c757d !important;
+}
+
+.kanban-column {
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+.task-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.task-card .card-title a:hover {
+    color: #0C234B !important;
+}
+.task-title-link {
+    color: #0C234B;
+    text-decoration: underline;
+}
+
+.task-title-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
 }
 </style>
 {% endblock %}
