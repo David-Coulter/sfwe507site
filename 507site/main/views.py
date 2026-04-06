@@ -155,20 +155,54 @@ def product_backlog(request):
 @login_required
 def sprint_board(request, sprint_pk):
     sprint = Sprint.objects.get(pk=sprint_pk)
-    sprint_tasks_qs = Task.objects.filter(sprint=sprint).order_by('priority', '-created_at')
-    sprint_tasks = list(sprint_tasks_qs)
     
-    total_story_points = sum(t.story_points for t in sprint_tasks)
-    completed_tasks = [t for t in sprint_tasks if t.status == 'COMPLETE']
-    completed_story_points = sum(t.story_points for t in completed_tasks)
+    # Get all tasks in sprint
+    all_sprint_tasks = list(
+        Task.objects.filter(sprint=sprint).order_by('priority', '-created_at')
+    )
+    
+    # Separate tasks by sprint_progress
+    not_started_tasks = [t for t in all_sprint_tasks if not t.sprint_progress or t.sprint_progress == 'NOT_STARTED']
+    in_progress_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'IN_PROGRESS']
+    in_review_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'IN_REVIEW']
+    done_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
 
+    # Calculate story points per column
+    not_started_points = sum(t.story_points for t in not_started_tasks)
+    in_progress_points = sum(t.story_points for t in in_progress_tasks)
+    in_review_points = sum(t.story_points for t in in_review_tasks)
+    done_points = sum(t.story_points for t in done_tasks)
+    
+    # Calculate sprint metrics
+    total_tasks = len(all_sprint_tasks)
+    total_story_points = sum(t.story_points for t in all_sprint_tasks)
+    
+    # Completed tasks (Done status)
+    completed_tasks_list = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
+    completed_tasks = len(completed_tasks_list)
+    completed_story_points = sum(t.story_points for t in completed_tasks_list)
+    
     context = {
         'sprint': sprint,
-        'sprint_tasks': sprint_tasks,
+        'sprint_tasks': all_sprint_tasks,
+        
+        # Sprint Progress columns
+        'not_started_tasks': not_started_tasks,
+        'in_progress_tasks': in_progress_tasks,
+        'in_review_tasks': in_review_tasks,
+        'done_tasks': done_tasks,
+
+        # Column metrics
+        'not_started_points': not_started_points,
+        'in_progress_points': in_progress_points,
+        'in_review_points': in_review_points,
+        'done_points': done_points,
+        
+        # Metrics
         'total_story_points': total_story_points,
         'completed_story_points': completed_story_points,
-        'total_tasks': len(sprint_tasks), 
-        'completed_tasks': len(completed_tasks),
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
     }
     
     return render(request, 'main/sprint_board.html', context)
@@ -197,8 +231,34 @@ def move_to_sprint(request, task_pk, sprint_pk):
     # Move task to sprint
     task.sprint = sprint
     task.status = 'SPRINT'
+    task.SPRINT_PROGRESS = 'NOT_STARTED'
     task.save()
     
     messages.success(request, f'Task "{task.title}" moved to {sprint.name}!')
     
     return redirect('product_backlog')
+
+@login_required
+def update_sprint_progress(request, task_pk, new_progress):
+
+    task = Task.objects.get(pk=task_pk)
+    
+    # Only update if task is in a sprint
+    if task.status != 'SPRINT':
+        messages.error(request, 'Task must be in sprint to update sprint progress!')
+        return redirect('task_detail', pk=task.pk)
+    
+    # Validate allowed transitions
+    valid_progress = ['NOT_STARTED', 'IN_PROGRESS', 'IN_REVIEW', 'DONE']
+    if new_progress not in valid_progress:
+        messages.error(request, 'Invalid sprint progress!')
+        return redirect('task_detail', pk=task.pk)
+    
+    # Update sprint status
+    old_progress = task.get_sprint_progress_display() if task.sprint_progress else 'Not Started'
+    task.sprint_progress = new_progress
+    task.save()
+    
+    messages.success(request, f'Task moved from {old_progress} to {task.get_sprint_progress_display()}!')
+    
+    return redirect('sprint_board', sprint_pk=task.sprint.pk)

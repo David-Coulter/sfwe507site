@@ -154,6 +154,80 @@
                             </button>
                         </div>
                     </div>
+                    
+                    {% if task.status == 'SPRINT' %}
+                    <!-- Sprint Workflow Card -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-kanban"></i> Sprint Progress
+                        </div>
+                        <div class="card-body">
+                            <!-- Current Sprint Progress -->
+                            <div class="mb-3">
+                                <strong>Current Status:</strong>
+                                {% if task.sprint_progress %}
+                                    <span class="badge 
+                                        {% if task.sprint_progress == 'NOT_STARTED' %}bg-secondary
+                                        {% elif task.sprint_progress == 'IN_PROGRESS' %}bg-info
+                                        {% elif task.sprint_progress == 'IN_REVIEW' %}bg-warning text-dark
+                                        {% elif task.sprint_progress == 'DONE' %}bg-success
+                                        {% endif %}">
+                                        {{ task.get_sprint_progress_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not Started</span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Workflow Actions -->
+                            <div class="d-flex gap-2 flex-wrap">
+                                {% if not task.sprint_progress or task.sprint_progress == 'NOT_STARTED' %}
+                                <a href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}" 
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-play-fill"></i> Start Work
+                                </a>
+                                {% endif %}
+                                
+                                {% if task.sprint_progress == 'IN_PROGRESS' %}
+                                <a href="{% url 'update_sprint_progress' task.pk 'IN_REVIEW' %}" 
+                                   class="btn btn-sm btn-warning text-dark">
+                                    <i class="bi bi-eye-fill"></i> Send to Review
+                                </a>
+                                <a href="{% url 'update_sprint_progress' task.pk 'NOT_STARTED' %}" 
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Back to Not Started
+                                </a>
+                                {% endif %}
+                                
+                                {% if task.sprint_progress == 'IN_REVIEW' %}
+                                <a href="{% url 'update_sprint_progress' task.pk 'DONE' %}" 
+                                   class="btn btn-sm btn-success">
+                                    <i class="bi bi-check-circle-fill"></i> Mark Done
+                                </a>
+                                <a href="{% url 'update_sprint_progress' task.pk 'IN_PROGRESS' %}" 
+                                   class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-arrow-left"></i> Return to Progress
+                                </a>
+                                {% endif %}
+                                
+                                {% if task.sprint_progress == 'DONE' %}
+                                <div class="alert alert-success mb-0">
+                                    <i class="bi bi-check-circle-fill"></i> 
+                                    <strong>Development Complete!</strong> Ready to move to testing.
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Workflow Diagram -->
+                            <div class="mt-3 pt-3 border-top">
+                                <small class="text-muted">
+                                    <i class="bi bi-diagram-3"></i> 
+                                    <strong>Workflow:</strong> Not Started → In Progress → In Review → Done → Testing
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <!-- Comments Section -->
                     <div class="card shadow-sm mb-3">
