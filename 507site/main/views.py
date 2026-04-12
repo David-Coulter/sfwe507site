@@ -208,14 +208,14 @@ def sprint_board(request, sprint_pk):
     return render(request, 'main/sprint_board.html', context)
 
 @login_required
-def sprint_list(request):
+def sprint_backlog(request):
     sprints = Sprint.objects.all().order_by('-created_at')
 
     context = {
         'sprints': sprints,
     }
 
-    return render(request, 'main/sprint_list.html', context)
+    return render(request, 'main/sprint_backlog.html', context)
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
