@@ -257,7 +257,7 @@ def move_to_sprint(request, task_pk, sprint_pk):
     # Move task to sprint
     task.sprint = sprint
     task.status = 'SPRINT'
-    task.SPRINT_PROGRESS = 'NOT_STARTED'
+    task.sprint_progress = 'NOT_STARTED'
     task.save()
 
     # Add comment
