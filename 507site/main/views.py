@@ -164,8 +164,7 @@ def update_task_description(request, pk):
 @login_required
 def product_backlog(request):
     # Retrieve tasks and sprints
-    backlog_tasks = Task.objects.filter(status='BACKLOG').order_by('priority', '-created_at')
-
+    backlog_tasks = Task.objects.filter(status='BACKLOG', sprint__isnull=True).order_by('priority', '-created_at')
     active_sprints = Sprint.objects.filter(status='ACTIVE').order_by('name')
     planning_sprints = Sprint.objects.filter(status='PLANNING').order_by('name')
     sprints = list(active_sprints) + list(planning_sprints)
@@ -245,7 +244,6 @@ def sprint_backlog(request):
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
-    # Move task to sprint
     task = Task.objects.get(pk=task_pk)
     sprint = Sprint.objects.get(pk=sprint_pk)
 

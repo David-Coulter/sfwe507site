@@ -63,53 +63,33 @@ class RegisterForm(UserCreationForm):
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['title', 'description', 'priority', 'story_points', 'assigned_to', 'estimated_hours', 'sprint']
+        fields = [
+            'title',
+            'description',
+            'priority',
+            'status',
+            'story_points',
+            'estimated_hours',
+            'assigned_to',
+            'sprint',
+        ]
         widgets = {
-            'title': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Enter task title',
-                'required': True
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'form-control',
-                'placeholder': 'Enter task description',
-                'rows': 4,
-                'required': True
-            }),
-            'priority': forms.Select(attrs={'class': 'form-select'}),
-            'story_points': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': '1, 2, 3, 5, 8, 13...',
-                'min': 1
-            }),
-            'assigned_to': forms.Select(attrs={'class': 'form-select'}),
-            'estimated_hours': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'e.g., 4.5',
-                'step': '0.5',
-                'min': 0
-            }),
+            'description': forms.Textarea(attrs={'rows': 4}),
+            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
             'sprint': forms.Select(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control', 'disabled': 'disabled'}),
         }
-        labels = {
-            'title': 'Task Title',
-            'description': 'Description',
-            'priority': 'Priority Level',
-            'story_points': 'Story Points',
-            'assigned_to': 'Assigned To',
-            'estimated_hours': 'Estimated Hours (optional)',
-        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['sprint'].queryset = Sprint.objects.filter(
+            status__in=['PLANNING', 'ACTIVE']
+        ).order_by('-created_at')
+        self.fields['sprint'].required = False
+        self.fields['sprint'].empty_label = "No Sprint (Backlog)"
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # Only show PLANNING and ACTIVE sprints
-            self.fields['sprint'].queryset = Sprint.objects.filter(
-                status__in=['PLANNING', 'ACTIVE']
-            ).order_by('-created_at')
-            # Make sprint optional
-            self.fields['sprint'].required = False
-            self.fields['sprint'].empty_label = "No Sprint (Backlog)"
-
+        self.fields['status'].disabled = True
+        self.fields['status'].required = False
 
 class CommentForm(forms.ModelForm):
     class Meta:
