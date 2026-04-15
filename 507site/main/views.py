@@ -97,15 +97,44 @@ def task_detail(request, pk):
 @login_required
 def edit_task(request, pk):
     task = Task.objects.get(pk=pk)
+    old_sprint = task.sprint  # Remember original sprint
+    
     if request.method == 'POST':
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             updated_task = form.save(commit=False)
-            updated_task.status = task.status
+            
+            new_sprint = form.cleaned_data.get('sprint')
+            
+            if new_sprint and not old_sprint:
+                print("ADDING SPRINT - Setting status to SPRINT")
+                updated_task.status = 'SPRINT'
+                updated_task.sprint_progress = 'NOT_STARTED'
+                
+            elif new_sprint and old_sprint and new_sprint != old_sprint:
+                print("CHANGING SPRINT - Keeping status SPRINT")
+                updated_task.status = 'SPRINT'
+                if not updated_task.sprint_progress:
+                    updated_task.sprint_progress = 'NOT_STARTED'
+                    
+            elif not new_sprint and old_sprint:  
+                print("REMOVING SPRINT - Setting status to BACKLOG")
+                updated_task.status = 'BACKLOG'
+                updated_task.sprint_progress = None
+            else:
+                print("NO CHANGE DETECTED")
+                print(f"  new_sprint is truthy? {bool(new_sprint)}")
+                print(f"  old_sprint is truthy? {bool(old_sprint)}")
+            
+            print(f"BEFORE SAVE: status={updated_task.status}, sprint={updated_task.sprint}, sprint_progress={updated_task.sprint_progress}")
             updated_task.save()
             form.save_m2m()
-        messages.success(request, f'Task "{task.title}" updated successfully!')
-        return redirect('task_detail', pk=task.pk)
+            
+            updated_task.refresh_from_db()
+            print(f"AFTER SAVE: status={updated_task.status}, sprint={updated_task.sprint}, sprint_progress={updated_task.sprint_progress}")
+            
+            messages.success(request, f'Task "{task.title}" updated successfully!')
+            return redirect('task_detail', pk=task.pk)
     else:
         form = TaskForm(instance=task)
         
@@ -138,8 +167,7 @@ def update_task_description(request, pk):
 @login_required
 def product_backlog(request):
     # Retrieve tasks and sprints
-    backlog_tasks = Task.objects.filter(status='BACKLOG').order_by('priority', '-created_at')
-
+    backlog_tasks = Task.objects.filter(status='BACKLOG', sprint__isnull=True).order_by('priority', '-created_at')
     active_sprints = Sprint.objects.filter(status='ACTIVE').order_by('name')
     planning_sprints = Sprint.objects.filter(status='PLANNING').order_by('name')
     sprints = list(active_sprints) + list(planning_sprints)
@@ -219,7 +247,6 @@ def sprint_backlog(request):
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
-    # Move task to sprint
     task = Task.objects.get(pk=task_pk)
     sprint = Sprint.objects.get(pk=sprint_pk)
 
