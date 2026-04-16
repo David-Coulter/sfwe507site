@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
+from django.utils import timezone
 from .models import Task, Comment, Sprint
-from .forms import TaskForm, CommentForm, RegisterForm
+from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
 from django.http import JsonResponse
 import json
 
@@ -241,6 +243,52 @@ def sprint_backlog(request):
     }
 
     return render(request, 'main/sprint_backlog.html', context)
+
+@staff_member_required
+def create_sprint(request):
+
+    if request.method == 'POST':
+        form = SprintForm(request.POST)
+        if form.is_valid():
+            sprint = form.save()
+            messages.success(request, f'{sprint.name} created successfully!')
+            return redirect('sprint_board', sprint_pk=sprint.pk)
+    else:
+        form = SprintForm()
+    
+    context = {
+        'form': form,
+        'sprint': None, 
+        'page_title': 'Create Sprint',
+    }
+    
+    return render(request, 'main/sprint_form.html', context)
+
+@staff_member_required
+def edit_sprint(request, sprint_pk):
+    sprint = Sprint.objects.get(pk=sprint_pk)
+    
+    # Prevent editing completed sprints
+    if sprint.status == 'COMPLETE':
+        messages.error(request, f'{sprint.name} is completed and cannot be edited.')
+        return redirect('sprint_board', sprint_pk=sprint.pk)
+    
+    if request.method == 'POST':
+        form = SprintForm(request.POST, instance=sprint)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'{sprint.name} updated successfully!')
+            return redirect('sprint_board', sprint_pk=sprint.pk)
+    else:
+        form = SprintForm(instance=sprint)
+    
+    context = {
+        'form': form,
+        'sprint': sprint,
+        'page_title': 'Edit Sprint',
+    }
+    
+    return render(request, 'main/sprint_form.html', context)
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):

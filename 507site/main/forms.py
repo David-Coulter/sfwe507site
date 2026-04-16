@@ -91,6 +91,34 @@ class TaskForm(forms.ModelForm):
         self.fields['status'].disabled = True
         self.fields['status'].required = False
 
+class SprintForm(forms.ModelForm):
+    class Meta:
+        model = Sprint
+        fields = [
+            'name',
+            'start_date',
+            'end_date',
+            'goal',
+            'status',
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Sprint 1'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'goal': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'What is the sprint goal?'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make dates optional
+        self.fields['start_date'].required = False
+        self.fields['end_date'].required = False
+        self.fields['goal'].required = False
+        
+        # Help text
+        self.fields['status'].help_text = 'Sprint lifecycle: Not Started → Planning → Active → Complete'
+
 class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
