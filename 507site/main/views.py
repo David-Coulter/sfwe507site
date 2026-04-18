@@ -1,6 +1,7 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.utils import timezone
 from .models import Task, Comment, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm
 from django.http import JsonResponse
@@ -96,14 +97,39 @@ def task_detail(request, pk):
 
 @login_required
 def edit_task(request, pk):
-    task = Task.objects.get(pk=pk)
+    task = get_object_or_404(Task, pk=pk)
+
+    # Prevent editing tasks that have been completed or in testing.
+    if task.status in ['TESTING', 'COMPLETE']:
+        messages.error(
+            request, 
+            f'Cannot edit task "{task.title}" - it is currently {task.get_status_display()}.'
+        )
+        return redirect('task_detail', pk=task.pk)
+    
+    old_sprint = task.sprint
+
     if request.method == 'POST':
         form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             updated_task = form.save(commit=False)
-            updated_task.status = task.status
+
+            new_sprint = form.cleaned_data.get('sprint')
+
+            if new_sprint and not old_sprint:
+                updated_task.status = 'SPRINT'
+                updated_task.sprint_progress = 'NOT_STARTED'
+            elif new_sprint and old_sprint and new_sprint != old_sprint:
+                updated_task.status = 'SPRINT'
+                if not updated_task.sprint_progress:
+                    updated_task.sprint_progress = 'NOT_STARTED'
+            elif not new_sprint and old_sprint:
+                updated_task.status = 'BACKLOG'
+                updated_task.sprint_progress = None
+
             updated_task.save()
             form.save_m2m()
+
         messages.success(request, f'Task "{task.title}" updated successfully!')
         return redirect('task_detail', pk=task.pk)
     else:
@@ -158,7 +184,7 @@ def sprint_board(request, sprint_pk):
     
     # Get all tasks in sprint
     all_sprint_tasks = list(
-        Task.objects.filter(sprint=sprint).order_by('priority', '-created_at')
+        Task.objects.filter(sprint=sprint, status='SPRINT').order_by('priority', '-created_at')
     )
     
     # Separate tasks by sprint_progress
@@ -208,14 +234,14 @@ def sprint_board(request, sprint_pk):
     return render(request, 'main/sprint_board.html', context)
 
 @login_required
-def sprint_list(request):
+def sprint_backlog(request):
     sprints = Sprint.objects.all().order_by('-created_at')
 
     context = {
         'sprints': sprints,
     }
 
-    return render(request, 'main/sprint_list.html', context)
+    return render(request, 'main/sprint_backlog.html', context)
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
@@ -233,6 +259,13 @@ def move_to_sprint(request, task_pk, sprint_pk):
     task.status = 'SPRINT'
     task.SPRINT_PROGRESS = 'NOT_STARTED'
     task.save()
+
+    # Add comment
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        content=f'Task moved to {sprint.name}'
+    )
     
     messages.success(request, f'Task "{task.title}" moved to {sprint.name}!')
     
@@ -258,7 +291,107 @@ def update_sprint_progress(request, task_pk, new_progress):
     old_progress = task.get_sprint_progress_display() if task.sprint_progress else 'Not Started'
     task.sprint_progress = new_progress
     task.save()
+
+    # Add comment
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        text=f"📝 Task moved from {old_progress} to {task.get_sprint_progress_display()} by {request.user.username}"
+    )
     
     messages.success(request, f'Task moved from {old_progress} to {task.get_sprint_progress_display()}!')
     
     return redirect('sprint_board', sprint_pk=task.sprint.pk)
+
+@login_required
+def testing_queue(request):
+
+    # Check if user is in Testing Manager group
+    if not request.user.groups.filter(name='Testing Manager').exists():
+        messages.error(request, 'You must be a Testing Manager to access the Testing Queue.')
+        return redirect('dashboard')
+    # Get all tasks in TESTING status
+    testing_tasks = Task.objects.filter(status='TESTING').order_by('-updated_at')
+    
+    # Calculate metrics
+    total_tasks = testing_tasks.count()
+    total_story_points = sum(task.story_points for task in testing_tasks)
+    
+    # Group by sprint (for organization)
+    sprints_with_tasks = {}
+    for task in testing_tasks:
+        if task.sprint:
+            if task.sprint not in sprints_with_tasks:
+                sprints_with_tasks[task.sprint] = []
+            sprints_with_tasks[task.sprint].append(task)
+        else:
+            # Tasks without sprint (orphaned)
+            if 'No Sprint' not in sprints_with_tasks:
+                sprints_with_tasks['No Sprint'] = []
+            sprints_with_tasks['No Sprint'].append(task)
+    
+    context = {
+        'testing_tasks': testing_tasks,
+        'sprints_with_tasks': sprints_with_tasks,
+        'total_tasks': total_tasks,
+        'total_story_points': total_story_points,
+    }
+    
+    return render(request, 'main/testing_queue.html', context)
+
+@login_required
+def mark_ready_for_test(request, pk):
+
+    task = Task.objects.get(pk=pk)
+    
+    # Only tasks in SPRINT status can be marked ready for test
+    if task.status != 'SPRINT':
+        messages.error(request, f'Task "{task.title}" must be in Sprint to mark ready for test.')
+        return redirect('task_detail', pk=task.pk)
+    
+    # Change status to TESTING
+    task.status = 'TESTING'
+    task.sprint_progress = None
+    task.save()
+
+    # Add comment that task is ready for test
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        text=f"🔍 Task marked as Ready for Test by {request.user.username}"
+    )
+    
+    messages.success(request, f'Task "{task.title}" marked as Ready for Test!')
+    
+    return redirect('task_detail', pk=task.pk)
+
+@login_required
+def pass_testing(request, pk):
+
+    # Check if user is in Testing Manager group
+    if not request.user.groups.filter(name='Testing Manager').exists():
+        messages.error(request, 'Only Testing Managers can pass tasks.')
+        return redirect('task_detail', pk=pk)
+    task = Task.objects.get(pk=pk)
+    
+    # Validate: Only tasks in TESTING status can be passed
+    if task.status != 'TESTING':
+        messages.error(request, f'Task "{task.title}" must be in Testing to mark as passed.')
+        return redirect('task_detail', pk=task.pk)
+    
+    # Change status to COMPLETE
+    task.status = 'COMPLETE'
+    task.completed_at = timezone.now()
+    task.save()
+
+    # Add comment that task is passed
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        text=f"✅ Testing passed by {request.user.username}"
+    )
+    
+    messages.success(request, f'Task "{task.title}" passed testing and is ready for release!')
+    
+    return redirect('testing_queue')
+

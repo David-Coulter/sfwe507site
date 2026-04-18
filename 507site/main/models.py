@@ -74,6 +74,11 @@ class Task(models.Model):
         blank=True,
         related_name='tasks'
     )
+
+    #Test Progress
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+
     class Meta:
         ordering = ['priority', '-created_at']
     

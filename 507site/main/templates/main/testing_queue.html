@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Testing Queue - PDMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-clipboard-check"></i> Testing Queue
+        </h1>
+        <div>
+            <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar3"></i> Sprint Backlog
+            </a>
+            <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-inbox"></i> Product Backlog
+            </a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-house"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ total_tasks }}</h2>
+                    <small class="text-muted">Tasks Ready for Test</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ total_story_points }}</h2>
+                    <small class="text-muted">Story Points in Testing</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if testing_tasks %}
+    <!-- Testing Tasks by Sprint -->
+    {% for sprint, tasks in sprints_with_tasks.items %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <i class="bi bi-calendar-check"></i> 
+            {% if sprint == 'No Sprint' %}
+                Tasks Without Sprint
+            {% else %}
+                {{ sprint.name }}
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Priority</th>
+                            <th>Story Points</th>
+                            <th>Assigned To</th>
+                            <th>Submitted</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'task_detail' task.pk %}">
+                                    {{ task.title }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if task.priority == 'CRITICAL' %}bg-danger
+                                    {% elif task.priority == 'HIGH' %}bg-warning
+                                    {% elif task.priority == 'MEDIUM' %}bg-info
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </td>
+                            <td>{{ task.story_points }} pts</td>
+                            <td>
+                                {% if task.assigned_to %}
+                                    {{ task.assigned_to.username }}
+                                {% else %}
+                                    <span class="text-muted">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    {{ task.updated_at|timesince }} ago
+                                </small>
+                            </td>
+                            <td>
+                                <!-- Pass Testing Button -->
+                                <form method="post" action="{% url 'pass_testing' task.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-success" title="Pass Testing">
+                                        <i class="bi bi-check-circle"></i> Pass
+                                    </button>
+                                </form>
+                                
+                                <!-- View Details Button -->
+                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-clipboard-x" style="font-size: 4rem; color: #0C234B;"></i>
+            <h3 class="mt-3">No Tasks in Testing Queue</h3>
+            <p class="text-muted">
+                Tasks marked as "Ready for Test" will appear here.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

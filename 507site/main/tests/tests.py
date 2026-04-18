@@ -73,7 +73,6 @@ class UserAuthenticationTests(TestCase):
 
 
 class TaskCreationTests(TestCase):
-    #Test cases for User Story 01 (Create Task)
 
     def setUp(self):
         #Set up test user and client
@@ -85,7 +84,6 @@ class TaskCreationTests(TestCase):
         self.client.login(username='testuser2', password='testpass123$')
     
     def test_create_task_valid_data(self):
-        #TC005: Create task with all valid fields
         response = self.client.post(reverse('create_task'), {
             'title': 'User Story 25: Add user profile page',
             'description': '## User Story\nAs a user, I want to view my profile',
