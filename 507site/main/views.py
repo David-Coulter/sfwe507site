@@ -290,6 +290,99 @@ def edit_sprint(request, sprint_pk):
     
     return render(request, 'main/sprint_form.html', context)
 
+@staff_member_required
+def complete_sprint(request, sprint_pk):
+    sprint = Sprint.objects.get(pk=sprint_pk)
+    
+    # Only ACTIVE sprints can be completed
+    if sprint.status != 'ACTIVE':
+        messages.error(request, f'Only active sprints can be completed. {sprint.name} is {sprint.get_status_display()}.')
+        return redirect('sprint_board', sprint_pk=sprint.pk)
+    
+    # Get task counts
+    all_tasks = Task.objects.filter(sprint=sprint)
+    done_tasks = all_tasks.filter(sprint_progress='DONE')
+    unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
+    
+    if request.method == 'POST':
+        # Get user's choice for unfinished tasks
+        unfinished_action = request.POST.get('unfinished_action')
+        target_sprint_id = request.POST.get('target_sprint')
+        mark_review_as_done = request.POST.get('mark_review_as_done') == 'on'
+
+        if mark_review_as_done:
+            in_review_tasks = all_tasks.filter(sprint_progress='IN_REVIEW')
+
+            for task in in_review_tasks:
+                task.sprint_progress = 'DONE'
+                task.save()
+            done_tasks = all_tasks.filter(sprint_progress='DONE')
+            unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
+        
+        # Handle DONE tasks - mark as complete
+        for task in done_tasks:
+            task.status = 'COMPLETE'
+            task.sprint_progress = None 
+            task.save()
+        
+    # Handle any unfinished tasks
+        # Move to the product backlog
+        if unfinished_action == 'backlog':
+            for task in unfinished_tasks:
+                task.sprint = None
+                task.status = 'BACKLOG'
+                task.sprint_progress = None
+                task.save()
+            unfinished_msg = "returned to Product Backlog"
+            
+        elif unfinished_action == 'sprint' and target_sprint_id:
+            
+            # Move to another sprint
+            target_sprint = Sprint.objects.get(pk=target_sprint_id)
+            for task in unfinished_tasks:
+                task.sprint = target_sprint
+                task.status = 'SPRINT'
+                task.sprint_progress = 'NOT_STARTED'
+                task.save()
+            unfinished_msg = f"moved to {target_sprint.name}"
+        else:
+            messages.error(request, 'Please select where to move unfinished tasks.')
+            return redirect('complete_sprint_confirm', sprint_pk=sprint.pk)
+        
+        # Complete the sprint
+        sprint.status = 'COMPLETE'
+        if not sprint.end_date:
+            sprint.end_date = timezone.now().date()
+        sprint.save()
+        
+        messages.success(
+            request,
+            f'{sprint.name} completed! {done_tasks.count()} tasks marked complete, '
+            f'{unfinished_tasks.count()} tasks {unfinished_msg}.'
+        )
+        
+        return redirect('sprint_backlog')
+    
+    # Get available sprints
+    available_sprints = Sprint.objects.filter(
+        status__in=['PLANNING', 'ACTIVE']
+    ).exclude(pk=sprint.pk).order_by('-created_at')
+
+    # Get tasks by status 
+    in_review_tasks = all_tasks.filter(sprint_progress='IN_REVIEW')
+    
+    context = {
+        'sprint': sprint,
+        'all_tasks': all_tasks,
+        'done_tasks': done_tasks,
+        'unfinished_tasks': unfinished_tasks,
+        'in_review_tasks': in_review_tasks,
+        'available_sprints': available_sprints,
+    }
+    
+    return render(request, 'main/complete_sprint.html', context)
+
+
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
     # Move task to sprint
