@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+
+{% block title %}Complete {{ sprint.name }} - PDMS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-check-circle"></i> Complete Sprint
+        </h1>
+        <p class="text-muted">{{ sprint.name }}</p>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Warning:</strong> This action will close the sprint and cannot be undone.
+    </div>
+
+    <!-- Sprint Summary -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <i class="bi bi-clipboard-data"></i> Sprint Summary
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h3 class="mb-0">{{ all_tasks.count }}</h3>
+                    <small class="text-muted">Total Tasks</small>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="mb-0 text-success">{{ done_tasks.count }}</h3>
+                    <small class="text-muted">Completed (Done)</small>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="mb-0 text-warning">{{ unfinished_tasks.count }}</h3>
+                    <small class="text-muted">Unfinished</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details -->
+    <div class="row mb-4">
+        <!-- Completed Tasks -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-check-circle"></i> Completed Tasks ({{ done_tasks.count }})
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    {% if done_tasks %}
+                    <ul class="list-group list-group-flush">
+                        {% for task in done_tasks %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ task.title }}</span>
+                            <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">No completed tasks</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Unfinished Tasks -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-exclamation-triangle"></i> Unfinished Tasks ({{ unfinished_tasks.count }})
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    {% if unfinished_tasks %}
+                    <ul class="list-group list-group-flush">
+                        {% for task in unfinished_tasks %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div>{{ task.title }}</div>
+                                <small class="text-muted">
+                                    {% if task.sprint_progress %}
+                                        {{ task.get_sprint_progress_display }}
+                                    {% else %}
+                                        Not Started
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">All tasks completed!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Sprint Form -->
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- Option to Mark In Review as Done -->
+        {% if in_review_tasks.count > 0 %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-eye"></i> Tasks In Review
+            </div>
+            <div class="card-body">
+                <div class="form-check">
+                    <input class="form-check-input" 
+                           type="checkbox" 
+                           name="mark_review_as_done" 
+                           id="mark_review_as_done">
+                    <label class="form-check-label" for="mark_review_as_done">
+                        <strong>Mark all {{ in_review_tasks.count }} "In Review" task(s) as Done</strong>
+                        <br>
+                        <small class="text-muted">
+                            These tasks will be marked as completed and included in the final sprint deliverables.
+                        </small>
+                    </label>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">Tasks in review:</small>
+                    <ul class="small mb-0">
+                        {% for task in in_review_tasks %}
+                        <li>{{ task.title }} ({{ task.story_points }} pts)</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <i class="bi bi-gear"></i> What should happen to unfinished tasks?
+            </div>
+            <div class="card-body">
+                {% if unfinished_tasks.count > 0 %}
+                <!-- Radio button options - will be hidden if all become complete -->
+                <div id="unfinished-section">
+                    <!-- Option 1: Return to Backlog -->
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" 
+                               type="radio" 
+                               name="unfinished_action" 
+                               id="backlog" 
+                               value="backlog"
+                               checked>
+                        <label class="form-check-label" for="backlog">
+                            <strong>Return to Product Backlog</strong>
+                            <br>
+                            <small class="text-muted">
+                                Unfinished tasks will be moved back to the backlog for future sprint planning.
+                            </small>
+                        </label>
+                    </div>
+        
+                    <!-- Option 2: Move to Another Sprint -->
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" 
+                               type="radio" 
+                               name="unfinished_action" 
+                               id="sprint" 
+                               value="sprint">
+                        <label class="form-check-label" for="sprint">
+                            <strong>Move to Another Sprint</strong>
+                            <br>
+                            <small class="text-muted">
+                                Transfer unfinished tasks to a different sprint.
+                            </small>
+                        </label>
+                    </div>
+        
+                    <!-- Sprint Selection (shown when "Move to Another Sprint" is selected) -->
+                    <div class="ms-4" id="sprint-selection" style="display: none;">
+                        <label for="target_sprint" class="form-label">Select Target Sprint:</label>
+                        <select class="form-select" name="target_sprint" id="target_sprint">
+                            <option value="">-- Choose Sprint --</option>
+                            {% for available_sprint in available_sprints %}
+                            <option value="{{ available_sprint.pk }}">
+                                {{ available_sprint.name }} ({{ available_sprint.get_status_display }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not available_sprints %}
+                        <small class="text-danger">No other sprints available. Please select "Return to Product Backlog".</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Success message - shown when all tasks become complete -->
+                <p class="text-success mb-0" id="all-complete-message" style="display: none;">
+                    <i class="bi bi-check-circle-fill"></i> 
+                    All tasks are completed! No unfinished tasks to handle.
+                </p>
+                
+                {% else %}
+                <!-- Already all complete from the start -->
+                <p class="text-success mb-0">
+                    <i class="bi bi-check-circle-fill"></i> 
+                    All tasks are completed! No unfinished tasks to handle.
+                </p>
+                <input type="hidden" name="unfinished_action" value="backlog">
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Action Summary -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> What will happen:
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Sprint status will change to <strong>Completed</strong></li>
+                    <li>Sprint will become <strong>read-only</strong></li>
+                    {% if in_review_tasks.count > 0 %}
+                    <li id="review-action-item" style="display: none;"><strong>{{ in_review_tasks.count }} "In Review" task(s)</strong> will be marked as Done and completed</li>
+                    {% endif %}
+                    {% if done_tasks.count > 0 %}
+                    <li><strong><span id="done-count">{{ done_tasks.count }}</span> completed task(s)</strong> will be marked as "Complete - Ready for Release"</li>
+                    {% endif %}
+                    {% if unfinished_tasks.count > 0 %}
+                    <li><strong><span id="unfinished-count">{{ unfinished_tasks.count }}</span> unfinished task(s)</strong> will be handled according to your selection above</li>
+                    {% endif %}
+                    <li>End date will be recorded as today (if not already set)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Complete Sprint
+            </button>
+            <a href="{% url 'sprint_board' sprint.pk %}" class="btn btn-secondary">
+                <i class="bi bi-x-circle"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.list-group-item {
+    border-left: none;
+    border-right: none;
+}
+.list-group-item:first-child {
+    border-top: none;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const backlogRadio = document.getElementById('backlog');
+    const sprintRadio = document.getElementById('sprint');
+    const sprintSelection = document.getElementById('sprint-selection');
+    const targetSprintSelect = document.getElementById('target_sprint');
+    
+    function updateSprintSelection() {
+        if (sprintRadio && sprintRadio.checked) {
+            sprintSelection.style.display = 'block';
+            targetSprintSelect.required = true;
+        } else {
+            sprintSelection.style.display = 'none';
+            targetSprintSelect.required = false;
+        }
+    }
+    
+    if (backlogRadio) backlogRadio.addEventListener('change', updateSprintSelection);
+    if (sprintRadio) sprintRadio.addEventListener('change', updateSprintSelection);
+    updateSprintSelection();
+    
+    // Handle "Mark In Review as Done" checkbox
+    const markReviewCheckbox = document.getElementById('mark_review_as_done');
+    if (markReviewCheckbox) {
+        const inReviewCount = {{ in_review_tasks.count|default:0 }};
+        const doneCountSpan = document.getElementById('done-count');
+        const unfinishedCountSpan = document.getElementById('unfinished-count');
+        const reviewActionItem = document.getElementById('review-action-item');
+        const unfinishedSection = document.getElementById('unfinished-section');
+        const allCompleteMessage = document.getElementById('all-complete-message');
+        
+        const originalDoneCount = {{ done_tasks.count }};
+        const originalUnfinishedCount = {{ unfinished_tasks.count }};
+        
+        markReviewCheckbox.addEventListener('change', function() {
+            const newUnfinishedCount = originalUnfinishedCount - (this.checked ? inReviewCount : 0);
+            
+            if (this.checked) {
+                // Update counts
+                if (doneCountSpan) doneCountSpan.textContent = originalDoneCount + inReviewCount;
+                if (unfinishedCountSpan) unfinishedCountSpan.textContent = newUnfinishedCount;
+                if (reviewActionItem) reviewActionItem.style.display = 'list-item';
+                
+                // If no more unfinished tasks, hide options and show success
+                if (newUnfinishedCount === 0) {
+                    if (unfinishedSection) unfinishedSection.style.display = 'none';
+                    if (allCompleteMessage) allCompleteMessage.style.display = 'block';
+                }
+            } else {
+                // Reset counts
+                if (doneCountSpan) doneCountSpan.textContent = originalDoneCount;
+                if (unfinishedCountSpan) unfinishedCountSpan.textContent = originalUnfinishedCount;
+                if (reviewActionItem) reviewActionItem.style.display = 'none';
+                
+                // Show options again if there were originally unfinished tasks
+                if (originalUnfinishedCount > 0) {
+                    if (unfinishedSection) unfinishedSection.style.display = 'block';
+                    if (allCompleteMessage) allCompleteMessage.style.display = 'none';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
