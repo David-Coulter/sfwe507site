@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
@@ -188,7 +188,7 @@ def sprint_board(request, sprint_pk):
     
     # Get all tasks in sprint
     all_sprint_tasks = list(
-        Task.objects.filter(sprint=sprint).order_by('priority', '-created_at')
+        Task.objects.filter(sprint=sprint, status='SPRINT').order_by('priority', '-created_at')
     )
     
     # Separate tasks by sprint_progress
@@ -308,6 +308,13 @@ def move_to_sprint(request, task_pk, sprint_pk):
     task.status = 'SPRINT'
     task.sprint_progress = 'NOT_STARTED'
     task.save()
+
+    # Add comment
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        content=f'Task moved to {sprint.name}'
+    )
     
     messages.success(request, f'Task "{task.title}" moved to {sprint.name}!')
     
@@ -333,6 +340,13 @@ def update_sprint_progress(request, task_pk, new_progress):
     old_progress = task.get_sprint_progress_display() if task.sprint_progress else 'Not Started'
     task.sprint_progress = new_progress
     task.save()
+
+    # Add comment
+    Comment.objects.create(
+        task=task,
+        author=request.user,
+        text=f"📝 Task moved from {old_progress} to {task.get_sprint_progress_display()} by {request.user.username}"
+    )
     
     messages.success(request, f'Task moved from {old_progress} to {task.get_sprint_progress_display()}!')
     

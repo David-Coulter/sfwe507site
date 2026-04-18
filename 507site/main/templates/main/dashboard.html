@@ -50,7 +50,7 @@
                     <div class="stat-label">
                         <i class="bi bi-clipboard-check"></i> Ready for Test
                     </div>
-                    <a href="#" class="btn btn-sm mt-3" style="border: 1px solid #A95C42; color: #A95C42;">View All</a>
+                    <a href="{% url 'testing_queue' %}" class="btn btn-sm mt-3" style="border: 1px solid #A95C42; color: #A95C42;">View All</a>
                 </div>
             </div>
         </div>
@@ -89,7 +89,7 @@
                         <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-calendar-week"></i> View Sprint Backlog
                         </a>
-                        <a href="#" class="btn btn-outline-secondary">
+                        <a href="{% url 'testing_queue' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-clipboard-check"></i> View Testing Queue
                         </a>
                     </div>

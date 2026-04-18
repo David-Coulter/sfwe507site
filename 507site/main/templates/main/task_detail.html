@@ -123,9 +123,19 @@
                     <i class="bi bi-card-text"></i> Task Details
                 </h1>
                 <div>
+                    {% if task.status == 'BACKLOG' or task.status == 'SPRINT' %}
                     <a href="{% url 'edit_task' task.pk %}" class="btn btn-primary">
                         <i class="bi bi-pencil"></i> Edit Task
                     </a>
+                    {% elif task.status == 'TESTING' %}
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-lock"></i> In Testing - Cannot Edit
+                    </span>
+                    {% elif task.status == 'COMPLETE' %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-lock"></i> Complete - Cannot Edit
+                    </span>
+                    {% endif %}
                     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>
@@ -216,7 +226,34 @@
                                     <strong>Development Complete!</strong> Ready to move to testing.
                                 </div>
                                 {% endif %}
+
+                                {% if task.status == 'SPRINT' and task.sprint_progress == 'DONE' %}
                             </div>
+
+                            <!-- Ready for Test Button -->
+                            <div class="card shadow-sm mb-4">
+                                <div class="card-body">
+                                    <p class="mb-3">
+                                        This task is marked as <strong>Done</strong> in the sprint. 
+                                        Mark it as <strong>Ready for Test</strong> to move it to the Testing Queue.
+                                    </p>
+                                    
+                                    <form method="post" action="{% url 'mark_ready_for_test' task.pk %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="bi bi-clipboard-check"></i> Mark Ready for Test
+                                        </button>
+                                    </form>
+                                    
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i> 
+                                            This will change the task status to "Ready for Test" and move it to the Testing Queue.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                             
                             <!-- Workflow Diagram -->
                             <div class="mt-3 pt-3 border-top">
