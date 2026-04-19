@@ -1,115 +1,138 @@
 {% extends 'base.html' %}
 
-{% block title %}Testing Queue - PDMS{% endblock %}
-
 {% block content %}
-<div class="container">
-    <!-- Page Header -->
+<div class="container-fluid mt-4">
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="page-title">
             <i class="bi bi-clipboard-check"></i> Testing Queue
         </h1>
         <div>
-            <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-calendar3"></i> Sprint Backlog
-            </a>
-            <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-inbox"></i> Product Backlog
-            </a>
             <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-house"></i> Dashboard
+                <i class="bi bi-arrow-left"></i> Dashboard
             </a>
         </div>
     </div>
 
     <!-- Summary Metrics -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-body text-center">
-                    <h2 class="mb-0">{{ total_tasks }}</h2>
-                    <small class="text-muted">Tasks Ready for Test</small>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ total_tasks }}</h3>
+                    <p class="mb-0">Tasks in Queue</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-body text-center">
-                    <h2 class="mb-0">{{ total_story_points }}</h2>
-                    <small class="text-muted">Story Points in Testing</small>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info">{{ total_story_points }}</h3>
+                    <p class="mb-0">Story Points</p>
                 </div>
             </div>
         </div>
     </div>
 
     {% if testing_tasks %}
-    <!-- Testing Tasks by Sprint -->
-    {% for sprint, tasks in sprints_with_tasks.items %}
-    <div class="card shadow-sm mb-4">
-        <div class="card-header">
-            <i class="bi bi-calendar-check"></i> 
-            {% if sprint == 'No Sprint' %}
-                Tasks Without Sprint
-            {% else %}
-                {{ sprint.name }}
-            {% endif %}
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
+        <!-- Tasks by Sprint -->
+        {% for sprint, tasks in sprints_with_tasks.items %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    {% if sprint == 'No Sprint' %}
+                        <i class="bi bi-inbox"></i> {{ sprint }}
+                    {% else %}
+                        <i class="bi bi-calendar"></i> {{ sprint.name }}
+                    {% endif %}
+                    <span class="badge bg-light text-dark ms-2">{{ tasks|length }} task{{ tasks|length|pluralize }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
                 <table class="table table-hover mb-0">
-                    <thead>
+                    <thead class="table-light">
                         <tr>
-                            <th>Task</th>
-                            <th>Priority</th>
-                            <th>Story Points</th>
-                            <th>Assigned To</th>
-                            <th>Submitted</th>
-                            <th>Actions</th>
+                            <th style="width: 5%;">Priority</th>
+                            <th style="width: 25%;">Task</th>
+                            <th style="width: 15%;">Developer</th>
+                            <th style="width: 10%;">Points</th>
+                            <th style="width: 15%;">Time in Queue</th>
+                            <th style="width: 10%;">Failed Count</th>
+                            <th style="width: 20%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for task in tasks %}
-                        <tr>
+                        <tr {% if task.failed_count >= 2 %}class="table-warning"{% endif %}>
+                            <!-- Priority Badge -->
                             <td>
-                                <a href="{% url 'task_detail' task.pk %}">
-                                    {{ task.title }}
-                                </a>
-                            </td>
-                            <td>
-                                <span class="badge 
-                                    {% if task.priority == 'CRITICAL' %}bg-danger
-                                    {% elif task.priority == 'HIGH' %}bg-warning
-                                    {% elif task.priority == 'MEDIUM' %}bg-info
-                                    {% else %}bg-secondary{% endif %}">
-                                    {{ task.get_priority_display }}
-                                </span>
-                            </td>
-                            <td>{{ task.story_points }} pts</td>
-                            <td>
-                                {% if task.assigned_to %}
-                                    {{ task.assigned_to.username }}
+                                {% if task.priority == 3 %}
+                                <span class="badge bg-danger">High</span>
+                                {% elif task.priority == 2 %}
+                                <span class="badge bg-warning text-dark">Medium</span>
                                 {% else %}
-                                    <span class="text-muted">Unassigned</span>
+                                <span class="badge bg-secondary">Low</span>
                                 {% endif %}
                             </td>
+
+                            <!-- Task Title -->
                             <td>
-                                <small class="text-muted">
-                                    {{ task.updated_at|timesince }} ago
-                                </small>
+                                <a href="{% url 'task_detail' task.pk %}" class="text-decoration-none">
+                                    <strong>{{ task.title }}</strong>
+                                </a>
+                                {% if task.failed_count >= 2 %}
+                                <i class="bi bi-exclamation-triangle-fill text-warning ms-2" title="Failed multiple times"></i>
+                                {% endif %}
                             </td>
+
+                            <!-- Developer -->
                             <td>
-                                <!-- Pass Testing Button -->
+                                {% if task.assigned_to %}
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                                {% else %}
+                                <span class="text-muted">Unassigned</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Story Points -->
+                            <td>
+                                <span class="badge bg-info">{{ task.story_points }} pts</span>
+                            </td>
+
+                            <!-- Time in Queue -->
+                            <td>
+                                {% if task.days_in_testing > 0 %}
+                                <span class="{% if task.days_in_testing >= 3 %}text-danger{% elif task.days_in_testing >= 1 %}text-warning{% endif %}">
+                                    {{ task.days_in_testing }} day{{ task.days_in_testing|pluralize }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">{{ task.hours_in_testing }} hour{{ task.hours_in_testing|pluralize }}</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Failed Count -->
+                            <td>
+                                {% if task.failed_count > 0 %}
+                                <span class="badge bg-danger">{{ task.failed_count }} time{{ task.failed_count|pluralize }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Quick Actions -->
+                            <td>
+                                <!-- Pass Button -->
                                 <form method="post" action="{% url 'pass_testing' task.pk %}" style="display: inline;">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-success" title="Pass Testing">
+                                    <button type="submit" class="btn btn-success btn-sm" title="Pass Testing">
                                         <i class="bi bi-check-circle"></i> Pass
                                     </button>
                                 </form>
-                                
-                                <!-- View Details Button -->
-                                <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary" title="View Details">
-                                    <i class="bi bi-eye"></i>
-                                </a>
+
+                                <!-- Fail Button (opens a popup) -->
+                                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#failModal{{ task.pk }}" title="Fail Testing">
+                                    <i class="bi bi-x-circle"></i> Fail
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -117,20 +140,68 @@
                 </table>
             </div>
         </div>
-    </div>
-    {% endfor %}
-    
-    {% else %}
-    <!-- Empty State -->
-    <div class="card shadow-sm">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-clipboard-x" style="font-size: 4rem; color: #0C234B;"></i>
-            <h3 class="mt-3">No Tasks in Testing Queue</h3>
-            <p class="text-muted">
-                Tasks marked as "Ready for Test" will appear here.
-            </p>
+
+        <!-- Fail Popup for each task -->
+        {% for task in tasks %}
+        <div class="modal fade" id="failModal{{ task.pk }}" tabindex="-1" aria-labelledby="failModalLabel{{ task.pk }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="failModalLabel{{ task.pk }}">
+                            <i class="bi bi-x-circle"></i> Fail Testing: {{ task.title }}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="post" action="{% url 'fail_testing' task.pk %}">
+                        {% csrf_token %}
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> This task will be returned to the Sprint for rework.
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="failure_reason{{ task.pk }}" class="form-label">
+                                    <strong>Failure Reason:</strong> <span class="text-danger">*</span>
+                                </label>
+                                <textarea 
+                                    class="form-control" 
+                                    id="failure_reason{{ task.pk }}" 
+                                    name="failure_reason" 
+                                    rows="4" 
+                                    required
+                                    placeholder="Describe the issues that need to be fixed..."></textarea>
+                                <small class="text-muted">This will be logged in the task history and testing notes.</small>
+                            </div>
+
+                            {% if task.testing_notes %}
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Previous Testing Notes:</strong></label>
+                                <div class="border p-2 bg-light" style="max-height: 150px; overflow-y: auto;">
+                                    <pre class="mb-0" style="white-space: pre-wrap;">{{ task.testing_notes }}</pre>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-x-circle"></i> Fail and Return to Sprint
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-    </div>
+        {% endfor %}
+        {% endfor %}
+
+    {% else %}
+        <!-- Empty State -->
+        <div class="alert alert-info text-center">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <h4 class="mt-3">Testing Queue is Empty</h4>
+            <p class="mb-0">No tasks are currently ready for testing.</p>
+        </div>
     {% endif %}
 </div>
 {% endblock %}

@@ -77,8 +77,10 @@ class Task(models.Model):
 
     #Test Progress
     completed_at = models.DateTimeField(null=True, blank=True)
-    
-
+    failed_count = models.IntegerField(default=0)
+    testing_notes = models.TextField(blank=True, default='')
+    moved_to_testing_at = models.DateTimeField(null=True, blank=True)  
+  
     class Meta:
         ordering = ['priority', '-created_at']
     
