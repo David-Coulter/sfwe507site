@@ -443,8 +443,20 @@ def testing_queue(request):
     if not request.user.groups.filter(name='Testing Manager').exists():
         messages.error(request, 'You must be a Testing Manager to access the Testing Queue.')
         return redirect('dashboard')
-
-    testing_tasks = Task.objects.filter(status='TESTING').order_by('-updated_at')
+    
+    # Get all tasks in TESTING status
+    testing_tasks = Task.objects.filter(status='TESTING').select_related('assigned_to', 'sprint').order_by('-priority', 'moved_to_testing_at')
+    
+    # Calculate metrics
+    now = timezone.now()
+    for task in testing_tasks:
+        if task.moved_to_testing_at:
+            delta = now - task.moved_to_testing_at
+            task.hours_in_testing = int(delta.total_seconds() / 3600)
+            task.days_in_testing = delta.days
+        else:
+            task.days_in_testing = 0
+            task.hours_in_testing = 0
 
     total_tasks = testing_tasks.count()
     total_story_points = sum(task.story_points for task in testing_tasks)
@@ -472,14 +484,17 @@ def testing_queue(request):
 
 @login_required
 def mark_ready_for_test(request, pk):
-    task = Task.objects.get(pk=pk)
-
+    task = get_object_or_404(Task, pk=pk)
+    
+    # Only tasks in SPRINT status can be marked ready for test
     if task.status != 'SPRINT':
         messages.error(request, f'Task "{task.title}" must be in Sprint to mark ready for test.')
         return redirect('task_detail', pk=task.pk)
 
     task.status = 'TESTING'
     task.sprint_progress = None
+    task.testing_started_at = timezone.now()
+    task.moved_to_testing_at = timezone.now()
     task.save()
 
     Comment.objects.create(
@@ -516,5 +531,48 @@ def pass_testing(request, pk):
     )
 
     messages.success(request, f'Task "{task.title}" passed testing and is ready for release!')
+    
+    return redirect('testing_queue')
+
+@login_required
+def fail_testing(request, pk):
+    task=get_object_or_404(Task, pk=pk)
+
+    # Verify user is Testing Manager
+    if not request.user.groups.filter(name='Testing Manager').exists():
+        messages.error(request, 'Only Testing Managers can fail tasks.')
+        return redirect('task_detail', pk=task.pk)
+    
+    if task.status != 'TESTING':
+        messages.error(request, f'Task "{task.title}" must be in Testing to mark as failed.')
+        return redirect('task_detail', pk=task.pk)
+    
+    if request.method == 'POST':
+        failure_reason = request.POST.get('failure_reason').strip()
+
+        if not failure_reason:
+            messages.error(request, 'Please provide a reason the test failed.')
+            return redirect('fail_testing', pk=task.pk)
+    
+        # Change status to SPRINT
+        task.status = 'SPRINT'
+        task.sprint_progress = 'IN_PROGRESS'
+        task.failed_count += 1
+        
+        failure_note = f"Failed Testing #{task.failed_count} on {timezone.now().strftime('%Y-%m-%d %H:%M')} ---\n{failure_reason}\n❌ Testing failed by {request.user.username}: "
+        task.testing_notes += failure_note
+        task.moved_to_testing_at = None
+        task.save()
+
+        # Add comment that task is failed
+        Comment.objects.create(
+            task=task,
+            author=request.user,
+            text=f"❌ Testing failed by {request.user.username}. Reason: {failure_reason}"
+        )
+
+        messages.warning(request, f'Task "{task.title}" failed testing and returned to sprint for rework.')
+        
+        return redirect('testing_queue')
 
     return redirect('testing_queue')
