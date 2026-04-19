@@ -23,13 +23,16 @@ class Task(models.Model):
     ]
 
     sprint_progress = models.CharField(
-        max_length=20, choices=[
+        max_length=20,
+        choices=[
             ('NOT_STARTED', 'Not Started'),
             ('IN_PROGRESS', 'In Progress'),
             ('IN_REVIEW', 'In Review'),
             ('DONE', 'Done'),
-    ],
-    blank=True, null=True, help_text="Progress of the task in the sprint"
+        ],
+        blank=True,
+        null=True,
+        help_text="Progress of the task in the sprint"
     )
     
     # Basic Information
@@ -75,7 +78,7 @@ class Task(models.Model):
         related_name='tasks'
     )
 
-    #Test Progress
+    # Test Progress
     completed_at = models.DateTimeField(null=True, blank=True)
     
 
@@ -84,7 +87,8 @@ class Task(models.Model):
     
     def __str__(self):
         return f"{self.title} [{self.get_status_display()}]"
-    
+
+
 class Comment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -97,7 +101,8 @@ class Comment(models.Model):
     def __str__(self):
         return f"{self.author.username} commented on {self.task.title} at {self.created_at}"
 
-class Sprint (models.Model):
+
+class Sprint(models.Model):
 
     SPRINT_STATUS = [
         ('NOT_STARTED', 'Not Started'),
@@ -105,6 +110,7 @@ class Sprint (models.Model):
         ('ACTIVE', 'Active'),
         ('COMPLETED', 'Completed'),
     ]
+
     name = models.CharField(max_length=100)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
@@ -130,4 +136,19 @@ class Sprint (models.Model):
     @property
     def completed_tasks(self):
         return self.task_set.filter(status='COMPLETE').count()
-    
+
+
+class TaskHistory(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='history')
+    field_changed = models.CharField(max_length=100)
+    old_value = models.CharField(max_length=255, blank=True, null=True)
+    new_value = models.CharField(max_length=255, blank=True, null=True)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.task.title} - {self.field_changed} changed"
