@@ -23,7 +23,6 @@ def log_task_history(task, field_changed, old_value, new_value, changed_by, note
             notes=notes
         )
 
-
 def register(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
@@ -621,9 +620,8 @@ def pass_testing(request, pk):
 
 @login_required
 def fail_testing(request, pk):
-    task=get_object_or_404(Task, pk=pk)
+    task = get_object_or_404(Task, pk=pk)
 
-    # Verify user is Testing Manager
     if not request.user.groups.filter(name='Testing Manager').exists():
         messages.error(request, 'Only Testing Managers can fail tasks.')
         return redirect('task_detail', pk=task.pk)
@@ -633,77 +631,57 @@ def fail_testing(request, pk):
         return redirect('task_detail', pk=task.pk)
     
     if request.method == 'POST':
-        failure_reason = request.POST.get('failure_reason').strip()
+        failure_reason = request.POST.get('failure_reason', '').strip()
 
         if not failure_reason:
             messages.error(request, 'Please provide a reason the test failed.')
-            return redirect('fail_testing', pk=task.pk)
-    
-        # Change status to SPRINT
+            return redirect('testing_queue')
+        
+        # Store old values for history
+        old_status = task.get_status_display()
+        old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+        
+        # Update task
         task.status = 'SPRINT'
         task.sprint_progress = 'IN_PROGRESS'
         task.failed_count += 1
         
-        failure_note = f"Failed Testing #{task.failed_count} on {timezone.now().strftime('%Y-%m-%d %H:%M')} ---\n{failure_reason}\n❌ Testing failed by {request.user.username}: "
+        # Append failure notes
+        failure_note = f"\n--- Failed Testing #{task.failed_count} on {timezone.now().strftime('%Y-%m-%d %H:%M')} ---\n{failure_reason}\n"
         task.testing_notes += failure_note
         task.moved_to_testing_at = None
         task.save()
-
-        # Add comment that task is failed
+        
+        # Log task history
+        log_task_history(
+            task=task,
+            field_changed='Status',
+            old_value=old_status,
+            new_value=task.get_status_display(),
+            changed_by=request.user
+        )
+        
+        log_task_history(
+            task=task,
+            field_changed='Sprint Progress',
+            old_value=old_progress,
+            new_value=task.get_sprint_progress_display(),
+            changed_by=request.user
+        )
+        
+        # Add comment
         Comment.objects.create(
             task=task,
             author=request.user,
             text=f"❌ Testing failed by {request.user.username}. Reason: {failure_reason}"
         )
 
-        messages.warning(request, f'Task "{task.title}" failed testing and returned to sprint for rework.')
+        messages.warning(
+            request, 
+            f'Task "{task.title}" failed testing and returned to Sprint for rework. '
+            f'Failed count: {task.failed_count}'
+        )
         
         return redirect('testing_queue')
 
     return redirect('testing_queue')
-
-    return redirect('testing_queue')
-
-
-@login_required
-def fail_testing(request, pk):
-    if not request.user.groups.filter(name='Testing Manager').exists():
-        messages.error(request, 'Only Testing Managers can fail tasks.')
-        return redirect('task_detail', pk=pk)
-
-    task = Task.objects.get(pk=pk)
-
-    if task.status != 'TESTING':
-        messages.error(request, f'Task "{task.title}" must be in Testing to mark as failed.')
-        return redirect('task_detail', pk=task.pk)
-
-    if request.method == 'POST':
-        failure_notes = request.POST.get('failure_notes', '').strip()
-        old_status = task.get_status_display()
-
-        task.status = 'FAILED'
-        task.save()
-
-        log_task_history(
-            task=task,
-            field_changed='Status',
-            old_value=old_status,
-            new_value=task.get_status_display(),
-            changed_by=request.user,
-            notes=failure_notes
-        )
-
-        Comment.objects.create(
-            task=task,
-            author=request.user,
-            text=f"Testing failed by {request.user.username}. Notes: {failure_notes}"
-        )
-
-        messages.success(request, f'Task "{task.title}" marked as failed.')
-        return redirect('testing_queue')
-
-    context = {
-        'task': task,
-        'page_title': 'Fail Testing',
-    }
-    return render(request, 'main/fail_testing.html', context)
