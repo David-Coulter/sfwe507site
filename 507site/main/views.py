@@ -3,10 +3,25 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
+from django.http import JsonResponse
 from .models import Task, Comment, TaskHistory, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
-from django.http import JsonResponse
 import json
+
+
+def log_task_history(task, field_changed, old_value, new_value, changed_by, notes=''):
+    old_value = '' if old_value is None else str(old_value)
+    new_value = '' if new_value is None else str(new_value)
+
+    if old_value != new_value or notes:
+        TaskHistory.objects.create(
+            task=task,
+            field_changed=field_changed,
+            old_value=old_value,
+            new_value=new_value,
+            changed_by=changed_by,
+            notes=notes
+        )
 
 
 def register(request):
@@ -53,6 +68,7 @@ def create_task(request):
             task.created_by = request.user
             task.status = 'BACKLOG'
             task.save()
+            form.save_m2m()
 
             messages.success(request, f'Task "{task.title}" created successfully!')
             return redirect('dashboard')
@@ -70,6 +86,7 @@ def create_task(request):
 @login_required
 def task_detail(request, pk):
     task = Task.objects.get(pk=pk)
+
     if request.method == 'POST':
         comment_form = CommentForm(request.POST)
         if comment_form.is_valid():
@@ -84,11 +101,14 @@ def task_detail(request, pk):
         comment_form = CommentForm()
 
     comments = task.comments.all()
+    history = task.history.all()[:50]
+
     context = {
         'task': task,
         'page_title': 'Task Details',
         'comment_form': comment_form,
-        'comments': comments
+        'comments': comments,
+        'history': history,
     }
     return render(request, 'main/task_detail.html', context)
 
@@ -101,13 +121,13 @@ def edit_task(request, pk):
         old_data = {
             'Title': task.title,
             'Description': task.description,
-            'Priority': str(task.priority),
+            'Priority': task.get_priority_display(),
             'Assigned To': task.assigned_to.username if task.assigned_to else '',
-            'Story Points': str(task.story_points) if task.story_points is not None else '',
-            'Estimated Hours': str(task.estimated_hours) if task.estimated_hours is not None else '',
-            'Status': task.status,
+            'Story Points': task.story_points if task.story_points is not None else '',
+            'Estimated Hours': task.estimated_hours if task.estimated_hours is not None else '',
+            'Status': task.get_status_display(),
             'Sprint': task.sprint.name if task.sprint else '',
-            'Sprint Progress': task.sprint_progress or '',
+            'Sprint Progress': task.get_sprint_progress_display() if task.sprint_progress else '',
         }
 
         form = TaskForm(request.POST, instance=task)
@@ -134,24 +154,23 @@ def edit_task(request, pk):
             new_data = {
                 'Title': updated_task.title,
                 'Description': updated_task.description,
-                'Priority': str(updated_task.priority),
+                'Priority': updated_task.get_priority_display(),
                 'Assigned To': updated_task.assigned_to.username if updated_task.assigned_to else '',
-                'Story Points': str(updated_task.story_points) if updated_task.story_points is not None else '',
-                'Estimated Hours': str(updated_task.estimated_hours) if updated_task.estimated_hours is not None else '',
-                'Status': updated_task.status,
+                'Story Points': updated_task.story_points if updated_task.story_points is not None else '',
+                'Estimated Hours': updated_task.estimated_hours if updated_task.estimated_hours is not None else '',
+                'Status': updated_task.get_status_display(),
                 'Sprint': updated_task.sprint.name if updated_task.sprint else '',
-                'Sprint Progress': updated_task.sprint_progress or '',
+                'Sprint Progress': updated_task.get_sprint_progress_display() if updated_task.sprint_progress else '',
             }
 
             for field in old_data:
-                if old_data[field] != new_data[field]:
-                    TaskHistory.objects.create(
-                        task=updated_task,
-                        field_changed=field,
-                        old_value=old_data[field],
-                        new_value=new_data[field],
-                        changed_by=request.user
-                    )
+                log_task_history(
+                    task=updated_task,
+                    field_changed=field,
+                    old_value=old_data[field],
+                    new_value=new_data[field],
+                    changed_by=request.user
+                )
 
             messages.success(request, f'Task "{task.title}" updated successfully!')
             return redirect('task_detail', pk=task.pk)
@@ -174,8 +193,19 @@ def update_task_description(request, pk):
             task = Task.objects.get(pk=pk)
             data = json.loads(request.body)
 
-            task.description = data.get('description')
+            old_description = task.description
+            new_description = data.get('description', '')
+
+            task.description = new_description
             task.save()
+
+            log_task_history(
+                task=task,
+                field_changed='Description',
+                old_value=old_description,
+                new_value=new_description,
+                changed_by=request.user
+            )
 
             return JsonResponse({'success': True})
         except Exception as e:
@@ -322,37 +352,70 @@ def complete_sprint(request, sprint_pk):
 
         if mark_review_as_done:
             in_review_tasks = all_tasks.filter(sprint_progress='IN_REVIEW')
-
             for task in in_review_tasks:
+                old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
                 task.sprint_progress = 'DONE'
                 task.save()
+                log_task_history(
+                    task=task,
+                    field_changed='Sprint Progress',
+                    old_value=old_progress,
+                    new_value=task.get_sprint_progress_display(),
+                    changed_by=request.user
+                )
+
             done_tasks = all_tasks.filter(sprint_progress='DONE')
             unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
 
         for task in done_tasks:
+            old_status = task.get_status_display()
+            old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+
             task.status = 'COMPLETE'
             task.sprint_progress = None
+            task.completed_at = timezone.now()
             task.save()
+
+            log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
+            log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
 
         if unfinished_action == 'backlog':
             for task in unfinished_tasks:
+                old_sprint = task.sprint.name if task.sprint else ''
+                old_status = task.get_status_display()
+                old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+
                 task.sprint = None
                 task.status = 'BACKLOG'
                 task.sprint_progress = None
                 task.save()
+
+                log_task_history(task, 'Sprint', old_sprint, '', request.user)
+                log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
+                log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
+
             unfinished_msg = "returned to Product Backlog"
 
         elif unfinished_action == 'sprint' and target_sprint_id:
             target_sprint = Sprint.objects.get(pk=target_sprint_id)
             for task in unfinished_tasks:
+                old_sprint = task.sprint.name if task.sprint else ''
+                old_status = task.get_status_display()
+                old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+
                 task.sprint = target_sprint
                 task.status = 'SPRINT'
                 task.sprint_progress = 'NOT_STARTED'
                 task.save()
+
+                log_task_history(task, 'Sprint', old_sprint, target_sprint.name, request.user)
+                log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
+                log_task_history(task, 'Sprint Progress', old_progress, task.get_sprint_progress_display(), request.user)
+
             unfinished_msg = f"moved to {target_sprint.name}"
         else:
             messages.error(request, 'Please select where to move unfinished tasks.')
-            return redirect('complete_sprint_confirm', sprint_pk=sprint.pk)
+            return redirect('complete_sprint', sprint_pk=sprint.pk)
 
         sprint.status = 'COMPLETE'
         if not sprint.end_date:
@@ -394,10 +457,18 @@ def move_to_sprint(request, task_pk, sprint_pk):
         messages.error(request, f'Task "{task.title}" is already assigned to {task.sprint.name}!')
         return redirect('product_backlog')
 
+    old_sprint = task.sprint.name if task.sprint else ''
+    old_status = task.get_status_display()
+    old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+
     task.sprint = sprint
     task.status = 'SPRINT'
     task.sprint_progress = 'NOT_STARTED'
     task.save()
+
+    log_task_history(task, 'Sprint', old_sprint, sprint.name, request.user)
+    log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
+    log_task_history(task, 'Sprint Progress', old_progress, task.get_sprint_progress_display(), request.user)
 
     Comment.objects.create(
         task=task,
@@ -423,17 +494,25 @@ def update_sprint_progress(request, task_pk, new_progress):
         messages.error(request, 'Invalid sprint progress!')
         return redirect('task_detail', pk=task.pk)
 
-    old_progress = task.get_sprint_progress_display() if task.sprint_progress else 'Not Started'
+    old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
     task.sprint_progress = new_progress
     task.save()
+
+    log_task_history(
+        task=task,
+        field_changed='Sprint Progress',
+        old_value=old_progress,
+        new_value=task.get_sprint_progress_display(),
+        changed_by=request.user
+    )
 
     Comment.objects.create(
         task=task,
         author=request.user,
-        text=f"Task moved from {old_progress} to {task.get_sprint_progress_display()} by {request.user.username}"
+        text=f"Task moved from {old_progress or 'Not Started'} to {task.get_sprint_progress_display()} by {request.user.username}"
     )
 
-    messages.success(request, f'Task moved from {old_progress} to {task.get_sprint_progress_display()}!')
+    messages.success(request, f'Task moved from {old_progress or "Not Started"} to {task.get_sprint_progress_display()}!')
 
     return redirect('sprint_board', sprint_pk=task.sprint.pk)
 
@@ -463,14 +542,10 @@ def testing_queue(request):
 
     sprints_with_tasks = {}
     for task in testing_tasks:
-        if task.sprint:
-            if task.sprint not in sprints_with_tasks:
-                sprints_with_tasks[task.sprint] = []
-            sprints_with_tasks[task.sprint].append(task)
-        else:
-            if 'No Sprint' not in sprints_with_tasks:
-                sprints_with_tasks['No Sprint'] = []
-            sprints_with_tasks['No Sprint'].append(task)
+        sprint_name = task.sprint.name if task.sprint else 'No Sprint'
+        if sprint_name not in sprints_with_tasks:
+            sprints_with_tasks[sprint_name] = []
+        sprints_with_tasks[sprint_name].append(task)
 
     context = {
         'testing_tasks': testing_tasks,
@@ -491,11 +566,17 @@ def mark_ready_for_test(request, pk):
         messages.error(request, f'Task "{task.title}" must be in Sprint to mark ready for test.')
         return redirect('task_detail', pk=task.pk)
 
+    old_status = task.get_status_display()
+    old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
+
     task.status = 'TESTING'
     task.sprint_progress = None
     task.testing_started_at = timezone.now()
     task.moved_to_testing_at = timezone.now()
     task.save()
+
+    log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
+    log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
 
     Comment.objects.create(
         task=task,
@@ -520,9 +601,13 @@ def pass_testing(request, pk):
         messages.error(request, f'Task "{task.title}" must be in Testing to mark as passed.')
         return redirect('task_detail', pk=task.pk)
 
+    old_status = task.get_status_display()
+
     task.status = 'COMPLETE'
     task.completed_at = timezone.now()
     task.save()
+
+    log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
 
     Comment.objects.create(
         task=task,
@@ -576,3 +661,49 @@ def fail_testing(request, pk):
         return redirect('testing_queue')
 
     return redirect('testing_queue')
+
+    return redirect('testing_queue')
+
+
+@login_required
+def fail_testing(request, pk):
+    if not request.user.groups.filter(name='Testing Manager').exists():
+        messages.error(request, 'Only Testing Managers can fail tasks.')
+        return redirect('task_detail', pk=pk)
+
+    task = Task.objects.get(pk=pk)
+
+    if task.status != 'TESTING':
+        messages.error(request, f'Task "{task.title}" must be in Testing to mark as failed.')
+        return redirect('task_detail', pk=task.pk)
+
+    if request.method == 'POST':
+        failure_notes = request.POST.get('failure_notes', '').strip()
+        old_status = task.get_status_display()
+
+        task.status = 'FAILED'
+        task.save()
+
+        log_task_history(
+            task=task,
+            field_changed='Status',
+            old_value=old_status,
+            new_value=task.get_status_display(),
+            changed_by=request.user,
+            notes=failure_notes
+        )
+
+        Comment.objects.create(
+            task=task,
+            author=request.user,
+            text=f"Testing failed by {request.user.username}. Notes: {failure_notes}"
+        )
+
+        messages.success(request, f'Task "{task.title}" marked as failed.')
+        return redirect('testing_queue')
+
+    context = {
+        'task': task,
+        'page_title': 'Fail Testing',
+    }
+    return render(request, 'main/fail_testing.html', context)

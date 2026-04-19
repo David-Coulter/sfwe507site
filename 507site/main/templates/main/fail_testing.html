@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Fail Testing - {{ task.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Fail Testing for {{ task.title }}</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="failure_notes" class="form-label">Failure Notes</label>
+            <textarea name="failure_notes" id="failure_notes" class="form-control" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-danger">Mark as Failed</button>
+        <a href="{% url 'task_detail' task.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
