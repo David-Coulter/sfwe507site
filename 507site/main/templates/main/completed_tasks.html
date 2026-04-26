@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Completed Tasks{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-check-circle-fill text-success"></i> Completed Tasks
+        </h1>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">Total Completed Tasks</h5>
+                    <h2 class="display-4 text-success">{{ total_tasks }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">Total Story Points Delivered</h5>
+                    <h2 class="display-4 text-primary">{{ total_story_points }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="sprint" class="form-label">Filter by Sprint</label>
+                    <select name="sprint" id="sprint" class="form-select" onchange="this.form.submit()">
+                        <option value="">All Sprints</option>
+                        {% for sprint in sprints %}
+                            <option value="{{ sprint.id }}" {% if selected_sprint == sprint.id|stringformat:"s" %}selected{% endif %}>
+                                {{ sprint.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-funnel"></i> Apply Filter
+                    </button>
+                    <a href="{% url 'completed_tasks' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Completed Tasks Table -->
+    {% if tasks %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Completed Tasks ({{ total_tasks }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Task</th>
+                                <th>Sprint</th>
+                                <th>Story Points</th>
+                                <th>Completed By</th>
+                                <th>Completed At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            <tr>
+                                <td>
+                                    <strong>{{ task.title }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {% if task.priority == 1 %}
+                                            <span class="badge bg-danger">Critical</span>
+                                        {% elif task.priority == 2 %}
+                                            <span class="badge bg-warning">High</span>
+                                        {% elif task.priority == 3 %}
+                                            <span class="badge bg-info">Medium</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Low</span>
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if task.sprint %}
+                                        <span class="badge bg-primary">{{ task.sprint.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">No Sprint</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                                </td>
+                                <td>
+                                    {% if task.assigned_to %}
+                                        <i class="bi bi-person-fill"></i> {{ task.assigned_to.username }}
+                                    {% else %}
+                                        <span class="text-muted">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if task.completed_at %}
+                                        <small>{{ task.completed_at|date:"M d, Y" }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ task.completed_at|time:"g:i A" }}</small>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'task_detail' task.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Grouped by Sprint (Optional Alternative View) -->
+        <div class="mt-4">
+            <h3>Tasks by Sprint</h3>
+            {% for sprint_name, sprint_tasks in tasks_by_sprint.items %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            {{ sprint_name }}
+                            <span class="badge bg-secondary float-end">
+                                {{ sprint_tasks|length }} task{{ sprint_tasks|length|pluralize }}
+                            </span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            {% for task in sprint_tasks %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ task.title }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            Completed: {{ task.completed_at|date:"M d, Y" }}
+                                        </small>
+                                    </div>
+                                    <span class="badge bg-primary">{{ task.story_points }} pts</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="alert alert-info text-center" role="alert">
+            <i class="bi bi-info-circle fs-1 d-block mb-3"></i>
+            <h4>No Completed Tasks</h4>
+            <p class="mb-0">There are no completed tasks to display. Complete some tasks to see them here!</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

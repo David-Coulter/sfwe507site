@@ -4,6 +4,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
+from django.db.models import Sum, Count, Q
 from .models import Task, Comment, TaskHistory, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
 import json
@@ -685,3 +686,42 @@ def fail_testing(request, pk):
         return redirect('testing_queue')
 
     return redirect('testing_queue')
+
+@login_required
+def completed_tasks(request):
+
+    # Get all completed tasks
+    tasks = Task.objects.filter(status='COMPLETE').select_related(
+        'assigned_to', 'created_by', 'sprint'
+    ).order_by('-completed_at')
+    
+    sprint_filter = request.GET.get('sprint', '')
+    
+    if sprint_filter:
+        tasks = tasks.filter(sprint_id=sprint_filter)
+    
+    # Calculate metrics
+    total_tasks = tasks.count()
+    total_story_points = tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    
+    # Get all sprints for filter dropdown
+    sprints = Sprint.objects.all().order_by('-created_at')
+    
+    # Group tasks by sprint for display
+    tasks_by_sprint = {}
+    for task in tasks:
+        sprint_name = task.sprint.name if task.sprint else 'No Sprint'
+        if sprint_name not in tasks_by_sprint:
+            tasks_by_sprint[sprint_name] = []
+        tasks_by_sprint[sprint_name].append(task)
+    
+    context = {
+        'tasks': tasks,
+        'tasks_by_sprint': tasks_by_sprint,
+        'total_tasks': total_tasks,
+        'total_story_points': total_story_points,
+        'sprints': sprints,
+        'selected_sprint': sprint_filter,
+    }
+    
+    return render(request, 'main/completed_tasks.html', context)

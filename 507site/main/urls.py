@@ -20,4 +20,5 @@ urlpatterns = [
     path('tas_<int:pk>/ready-for-test/', views.mark_ready_for_test, name='mark_ready_for_test'),
     path('task_<int:pk>/pass-testing/', views.pass_testing, name='pass_testing'),
     path('task_<int:pk>/fail-testing/', views.fail_testing, name='fail_testing'),
+    path('tasks/completed/', views.completed_tasks, name='completed_tasks'),
 ]
