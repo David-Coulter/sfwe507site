@@ -1,15 +1,23 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.mail import EmailMessage
+from django.conf import settings
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta, datetime
-from django.http import JsonResponse
-from django.db.models import Sum
+from django.http import HttpResponse, JsonResponse
+from django.db.models import Sum, Count, Q
+from django.contrib.auth.models import User
 from django.db import models
 from main.models import Task, Comment, TaskHistory, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
+from django.template.loader import render_to_string
+from django.template.loader import render_to_string
 from collections import defaultdict
+from weasyprint import HTML, CSS
+from weasyprint.text.fonts import FontConfiguration
+import csv
 import json
 
 
@@ -914,3 +922,365 @@ def completed_tasks(request):
     }
     
     return render(request, 'main/completed_tasks.html', context)
+
+@login_required
+def sprint_report(request, sprint_pk):
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+    
+    all_sprints = Sprint.objects.all().order_by('-created_at')
+
+    all_tasks = Task.objects.filter(sprint=sprint). select_related('assigned_to', 'created_by')
+
+    completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
+    incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority', 'created_at')
+
+    total_story_points = all_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    completed_story_points = completed_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    incomplete_story_points = total_story_points - completed_story_points
+    
+    completion_rate = (completed_story_points / total_story_points * 100) if total_story_points > 0 else 0
+
+    status_breakdown = {
+        'BACKLOG': all_tasks.filter(status='BACKLOG').count(),
+        'SPRINT': all_tasks.filter(status='SPRINT').count(),
+        'TESTING': all_tasks.filter(status='TESTING').count(),
+        'COMPLETE': all_tasks.filter(status='COMPLETE').count(),
+    }
+
+    # Calculate team member contributions
+    team_contributions = []
+
+    # Get distinct assigned users
+    assigned_user_ids = set(all_tasks.exclude(assigned_to__isnull=True).values_list('assigned_to', flat=True))
+
+    for user_id in assigned_user_ids:
+            user = User.objects.get(pk=user_id)
+            
+            member_tasks = all_tasks.filter(assigned_to=user)
+            member_completed = member_tasks.filter(status='COMPLETE')
+            
+            team_contributions.append({
+                'name': user.username,
+                'total_tasks': member_tasks.count(),
+                'completed_tasks': member_completed.count(),
+                'total_points': member_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+                'completed_points': member_completed.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+            })
+
+    # Sort team contributions by completed story points
+    team_contributions.sort(key=lambda x: x['completed_points'], reverse=True)
+
+    # Calculate velocity
+    velocity = completed_story_points if sprint.status == 'COMPLETE' else None
+
+    # Create the chart 
+    chart_labels = []
+    chart_data = []
+    chart_colors = []
+
+    status_colors = {
+        'COMPLETE': '#28a745',
+        'TESTING': '#17a2b8',  
+        'SPRINT': '#ffc107',    
+        'BACKLOG': '#6c757d', 
+    }
+
+    for status, count in status_breakdown.items():
+        if count > 0:
+            chart_labels.append(status.capitalize())
+            chart_data.append(count)
+            chart_colors.append(status_colors.get(status, '#6c757d'))
+    
+    context = {
+        'sprint': sprint,
+        'all_sprints': all_sprints,
+        'all_tasks': all_tasks,
+        'completed_tasks': completed_tasks,
+        'incomplete_tasks': incomplete_tasks,
+        'total_story_points': total_story_points,
+        'completed_story_points': completed_story_points,
+        'incomplete_story_points': incomplete_story_points,
+        'completion_rate': round(completion_rate, 1),
+        'status_breakdown': status_breakdown,
+        'team_contributions': team_contributions,
+        'velocity': velocity,
+        'chart_labels': json.dumps(chart_labels),
+        'chart_data': json.dumps(chart_data),
+        'chart_colors': json.dumps(chart_colors),
+    }
+    
+    return render(request, 'main/sprint_report.html', context)
+
+@login_required
+def export_sprint_report_csv(request, sprint_pk):
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="sprint_report_{sprint.name.replace(" ", "_")}.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Sprint Summary
+    writer.writerow(['Sprint Report'])
+    writer.writerow(['Sprint Name', sprint.name])
+    writer.writerow(['Status', sprint.get_status_display()])
+    if sprint.start_date and sprint.end_date:
+        writer.writerow(['Start Date', sprint.start_date.strftime('%Y-%m-%d')])
+        writer.writerow(['End Date', sprint.end_date.strftime('%Y-%m-%d')])
+    if sprint.goal:
+        writer.writerow(['Goal', sprint.goal])
+    writer.writerow([])
+    
+    # Story Points Summary
+    all_tasks = Task.objects.filter(sprint=sprint)
+    completed_tasks = all_tasks.filter(status='COMPLETE')
+    
+    total_points = all_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    completed_points = completed_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    
+    writer.writerow(['Story Points Summary'])
+    writer.writerow(['Total Planned', total_points])
+    writer.writerow(['Completed', completed_points])
+    writer.writerow(['Incomplete', total_points - completed_points])
+    writer.writerow(['Completion Rate', f"{(completed_points/total_points*100):.1f}%" if total_points > 0 else "0%"])
+    writer.writerow([])
+    
+    # Completed Tasks
+    writer.writerow(['Completed Tasks'])
+    writer.writerow(['Title', 'Story Points', 'Priority', 'Assigned To', 'Completed At'])
+    for task in completed_tasks.order_by('-completed_at'):
+        writer.writerow([
+            task.title,
+            task.story_points,
+            task.get_priority_display(),
+            task.assigned_to.username if task.assigned_to else 'Unassigned',
+            task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else 'N/A'
+        ])
+    writer.writerow([])
+    
+    # Incomplete Tasks
+    incomplete_tasks = all_tasks.exclude(status='COMPLETE')
+    if incomplete_tasks.exists():
+        writer.writerow(['Incomplete Tasks'])
+        writer.writerow(['Title', 'Story Points', 'Priority', 'Status', 'Assigned To'])
+        for task in incomplete_tasks.order_by('priority'):
+            writer.writerow([
+                task.title,
+                task.story_points,
+                task.get_priority_display(),
+                task.get_status_display(),
+                task.assigned_to.username if task.assigned_to else 'Unassigned'
+            ])
+        writer.writerow([])
+    
+    # Team Contributions
+    writer.writerow(['Team Member Contributions'])
+    writer.writerow(['Team Member', 'Total Tasks', 'Completed Tasks', 'Total Points', 'Completed Points'])
+    
+    team_members = all_tasks.values('assigned_to').distinct()
+    for member in team_members:
+        if member['assigned_to']:
+            user = User.objects.get(pk=member['assigned_to'])
+            
+            member_tasks = all_tasks.filter(assigned_to=user)
+            member_completed = member_tasks.filter(status='COMPLETE')
+            
+            writer.writerow([
+                user.username,
+                member_tasks.count(),
+                member_completed.count(),
+                member_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+                member_completed.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+            ])
+    
+    return response
+ 
+ 
+@login_required
+def export_sprint_report_pdf(request, sprint_pk):
+    
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+    
+    # Get all the same data as the regular report
+    all_tasks = Task.objects.filter(sprint=sprint).select_related('assigned_to', 'created_by')
+    completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
+    incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority', '-created_at')
+    
+    total_story_points = all_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    completed_story_points = completed_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+    completion_rate = (completed_story_points / total_story_points * 100) if total_story_points > 0 else 0
+    
+    # Team contributions
+    team_contributions = []
+    team_members = all_tasks.values('assigned_to').distinct()
+    
+    for member in team_members:
+        if member['assigned_to']:
+            user = User.objects.get(pk=member['assigned_to'])
+            
+            member_tasks = all_tasks.filter(assigned_to=user)
+            member_completed = member_tasks.filter(status='COMPLETE')
+            
+            team_contributions.append({
+                'name': user.username,
+                'total_tasks': member_tasks.count(),
+                'completed_tasks': member_completed.count(),
+                'total_points': member_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+                'completed_points': member_completed.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+            })
+    
+    team_contributions.sort(key=lambda x: x['completed_points'], reverse=True)
+    
+    context = {
+        'sprint': sprint,
+        'completed_tasks': completed_tasks,
+        'incomplete_tasks': incomplete_tasks,
+        'total_story_points': total_story_points,
+        'completed_story_points': completed_story_points,
+        'completion_rate': round(completion_rate, 1),
+        'team_contributions': team_contributions,
+        'generated_date': timezone.now(),
+    }
+    
+    # Render HTML template
+    html_string = render_to_string('main/sprint_report_pdf.html', context)
+    
+    # Create PDF
+    font_config = FontConfiguration()
+    html = HTML(string=html_string)
+    
+    # Generate PDF
+    pdf = html.write_pdf(font_config=font_config)
+    
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="sprint_report_{sprint.name.replace(" ", "_")}.pdf"'
+    
+    return response
+
+@login_required
+def email_sprint_report(request, sprint_pk):
+
+    if request.method != 'POST':
+        return redirect('sprint_report', sprint_pk=sprint_pk)
+    
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+    
+    # Get email addresses
+    recipient_emails = request.POST.get('recipient_email', '').strip()
+    if not recipient_emails:
+        messages.error(request, 'Please provide at least one recipient email address.')
+        return redirect('sprint_report', sprint_pk=sprint_pk)
+    
+    recipients = [email.strip() for email in recipient_emails.split(',')]
+    
+    # Get email message
+    user_message = request.POST.get('email_message', '').strip()
+    
+    try:
+        # Get report data
+        all_tasks = Task.objects.filter(sprint=sprint).select_related('assigned_to', 'created_by')
+        completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
+        incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority')
+        
+        total_story_points = all_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+        completed_story_points = completed_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
+        completion_rate = (completed_story_points / total_story_points * 100) if total_story_points > 0 else 0
+        
+        # Team contributions
+        team_contributions = []
+        team_members = all_tasks.values('assigned_to').distinct()
+        
+        for member in team_members:
+            if member['assigned_to']:
+                user = User.objects.get(pk=member['assigned_to'])
+                
+                member_tasks = all_tasks.filter(assigned_to=user)
+                member_completed = member_tasks.filter(status='COMPLETE')
+                
+                team_contributions.append({
+                    'name': user.username,
+                    'total_tasks': member_tasks.count(),
+                    'completed_tasks': member_completed.count(),
+                    'total_points': member_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+                    'completed_points': member_completed.aggregate(Sum('story_points'))['story_points__sum'] or 0,
+                })
+        
+        team_contributions.sort(key=lambda x: x['completed_points'], reverse=True)
+        
+        context = {
+            'sprint': sprint,
+            'completed_tasks': completed_tasks,
+            'incomplete_tasks': incomplete_tasks,
+            'total_story_points': total_story_points,
+            'completed_story_points': completed_story_points,
+            'completion_rate': round(completion_rate, 1),
+            'team_contributions': team_contributions,
+            'generated_date': timezone.now(),
+        }
+        
+        # Render PDF
+        html_string = render_to_string('main/sprint_report_pdf.html', context)
+        font_config = FontConfiguration()
+        html = HTML(string=html_string)
+        pdf = html.write_pdf(font_config=font_config)
+        
+        # Create email
+        subject = f'Sprint Report: {sprint.name}'
+        
+        # Email body
+        body = f"""
+            Sprint Report: {sprint.name}
+            
+            Sprint Summary:
+            - Status: {sprint.get_status_display()}
+            - Story Points Completed: {completed_story_points}/{total_story_points} ({completion_rate:.1f}%)
+            - Tasks Completed: {completed_tasks.count()}/{all_tasks.count()}
+            """
+        
+        if sprint.start_date and sprint.end_date:
+            body += f"- Duration: {sprint.start_date.strftime('%B %d, %Y')} - {sprint.end_date.strftime('%B %d, %Y')}\n"
+        
+        if sprint.goal:
+            body += f"\nSprint Goal:\n{sprint.goal}\n"
+        
+        if user_message:
+            body += f"\n---\nMessage from {request.user.username}:\n{user_message}\n"
+        
+        body += f"""
+            ---
+            See attached PDF for complete sprint report.
+            
+            Generated by PDMS - Project Development Management System
+            """
+        
+        # Create email with PDF attachment
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipients,
+            reply_to=[request.user.email] if request.user.email else None,
+        )
+        
+        # Attach PDF
+        email.attach(
+            f'sprint_report_{sprint.name.replace(" ", "_")}.pdf',
+            pdf,
+            'application/pdf'
+        )
+        
+        # Send email
+        email.send(fail_silently=False)
+        
+        messages.success(
+            request,
+            f'Sprint report emailed successfully to {len(recipients)} recipient(s)!'
+        )
+        
+    except Exception as e:
+        messages.error(
+            request,
+            f'Failed to send email: {str(e)}. Please check your email configuration.'
+        )
+    
+    return redirect('sprint_report', sprint_pk=sprint_pk)

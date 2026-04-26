@@ -45,6 +45,22 @@ A Django-based Agile project management system for tracking tasks through a comp
    ```
 
 2. **Install dependencies:**
+
+   **System dependencies:**
+      **macOS:**
+      ```bash
+         brew install cairo pango gdk-pixbuf libffi
+      ```
+
+      **Ubuntu/Debian:**
+      ```bash
+         sudo apt-get install build-essential python3-dev python3-pip \
+         libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev
+      ```
+      **Windows:**
+      - Download and install GTK3 runtime from [here](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer)
+
+   **Python Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
@@ -54,17 +70,34 @@ A Django-based Agile project management system for tracking tasks through a comp
    python manage.py migrate
    ```
 
-4. **Create a superuser:**
+4. **Configure email (optional - for sprint report emails):**
+   
+   Edit `507site/settings.py`:
+   ```python
+      # For development/testing (emails print to console):
+      EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+      
+      # For production (requires SMTP):
+      # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+      # EMAIL_HOST = 'smtp.gmail.com'
+      # EMAIL_PORT = 587
+      # EMAIL_USE_TLS = True
+      # EMAIL_HOST_USER = 'your-email@gmail.com'
+      # EMAIL_HOST_PASSWORD = 'your-app-password'
+      # DEFAULT_FROM_EMAIL = 'your-email@gmail.com'
+   ```
+
+5. **Create a superuser:**
    ```bash
    python manage.py createsuperuser
    ```
 
-5. **Run the development server:**
+6. **Run the development server:**
    ```bash
    python manage.py runserver
    ```
 
-6. **Access the application:**
+7. **Access the application:**
    - Main site: http://127.0.0.1:8000/
    - Admin panel: http://127.0.0.1:8000/admin/
 
@@ -75,23 +108,46 @@ A Django-based Agile project management system for tracking tasks through a comp
 ```
 507site/
 ├── 507site/              # Project settings
-│   ├── settings.py
-│   ├── urls.py
-│   └── wsgi.py
+│   ├── settings.py       # Django configuration
+│   ├── urls.py           # Root URL routing
+│   └── wsgi.py           # WSGI configuration
 ├── main/                 # Main application
-│   ├── models.py         # Task, Sprint models
-│   ├── views.py          # View functions
-│   ├── forms.py          # Task creation forms
+│   ├── models.py         # Task, Sprint, TaskHistory models
+│   ├── views.py          # View functions and business logic
+│   ├── forms.py          # Task and Sprint forms
 │   ├── urls.py           # URL routing
-│   ├── admin.py          # Admin configuration
+│   ├── admin.py          # Admin panel configuration
 │   ├── templatetags/     # Custom template filters
 │   │   └── markdown_extras.py
-│   └── templates/        # HTML templates
-│       ├── base.html
-│       └── main/
-│           ├── dashboard.html
-│           ├── task_form.html
-│           └── task_detail.html
+│   ├── templates/        # HTML templates
+│   │   ├── base.html     # Base template with UA branding
+│   │   ├── main/
+│   │       ├── complete_sprint.html
+│   │       ├── completed_tasks.html
+│   │       ├── dashboard.html
+│   │       ├── fail_testing.html
+│   │       ├── product_backlog.html
+│   │       ├── reopen_sprint_confirm.html
+│   │       ├── sprint_backlog.html
+│   │       ├── sprint_board.html
+│   │       ├── sprint_burndown.html
+│   │       ├── sprint_form.html
+│   │       ├── sprint_report_pdf.html
+│   │       ├── sprint_report.html
+│   │       ├── task_detail.html
+│   │       ├── task_form.html
+│   │       ├── task_list.html
+│   │       ├── testing_queue.html
+│   |   └── registration/
+│   │       ├── login.html
+│   │       └── register.html
+│   └── tests/            # Automated tests
+│       ├── test_epic_3.py 
+│       ├── test_us_19.py 
+│       ├── test_us_22.py 
+│       ├── test_us_23.py 
+│       ├── test_us_23.py 
+│       └── tests.py
 ├── manage.py
 └── requirements.txt
 ```

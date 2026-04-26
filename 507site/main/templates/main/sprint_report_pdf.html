@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Sprint Report - {{ sprint.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        h1 {
+            color: #0C234B;  
+            border-bottom: 3px solid #AB0520;  
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        h2 {
+            color: #0C234B;  
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 16pt;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #AB0520;  
+            padding-bottom: 15px;
+        }
+        
+        .summary-box {
+            background-color: #f8f9fa;
+            border: 2px solid #0C234B;  
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-left: 4px solid #AB0520;  
+            border-radius: 5px;
+            min-width: 150px;
+        }
+        
+        .metric-value {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #0C234B;  
+        }
+        
+        .metric-label {
+            font-size: 10pt;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th {
+            background-color: #0C234B;  
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 9pt;
+            font-weight: bold;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-warning {
+            background-color: #ffc107;
+            color: #000;
+        }
+        
+        .badge-danger {
+            background-color: #AB0520;  
+            color: white;
+        }
+        
+        .badge-info {
+            background-color: #1E5288;  
+            color: white;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #0C234B;  
+            text-align: center;
+            font-size: 9pt;
+            color: #6c757d;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sprint Report: {{ sprint.name }}</h1>
+        <p><strong>Generated:</strong> {{ generated_date|date:"F d, Y - g:i A" }}</p>
+    </div>
+    
+    <!-- Sprint Summary -->
+    <div class="summary-box">
+        <h2>Sprint Summary</h2>
+        <p><strong>Sprint:</strong> {{ sprint.name }}</p>
+        <p><strong>Status:</strong> {{ sprint.get_status_display }}</p>
+        {% if sprint.start_date and sprint.end_date %}
+            <p><strong>Duration:</strong> {{ sprint.start_date|date:"F d, Y" }} - {{ sprint.end_date|date:"F d, Y" }}</p>
+        {% endif %}
+        {% if sprint.goal %}
+            <p><strong>Goal:</strong> {{ sprint.goal }}</p>
+        {% endif %}
+    </div>
+    
+    <!-- Metrics -->
+    <h2>Story Points Summary</h2>
+    <div class="metrics">
+        <div class="metric">
+            <div class="metric-value">{{ total_story_points }}</div>
+            <div class="metric-label">Planned</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value">{{ completed_story_points }}</div>
+            <div class="metric-label">Completed</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value">{{ completion_rate }}%</div>
+            <div class="metric-label">Completion Rate</div>
+        </div>
+    </div>
+    
+    <!-- Team Contributions -->
+    {% if team_contributions %}
+    <h2>Team Member Contributions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Team Member</th>
+                <th style="text-align: center;">Total Tasks</th>
+                <th style="text-align: center;">Completed</th>
+                <th style="text-align: center;">Total Points</th>
+                <th style="text-align: center;">Completed Points</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in team_contributions %}
+            <tr>
+                <td>{{ member.name }}</td>
+                <td style="text-align: center;">{{ member.total_tasks }}</td>
+                <td style="text-align: center;">{{ member.completed_tasks }}</td>
+                <td style="text-align: center;">{{ member.total_points }}</td>
+                <td style="text-align: center;">{{ member.completed_points }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    
+    <!-- Completed Tasks -->
+    <div class="page-break"></div>
+    <h2>Completed Tasks ({{ completed_tasks.count }})</h2>
+    {% if completed_tasks %}
+    <table>
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th style="text-align: center;">Story Points</th>
+                <th>Assigned To</th>
+                <th>Completed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in completed_tasks %}
+            <tr>
+                <td>
+                    {{ task.title }}
+                    {% if task.priority == 1 %}
+                        <span class="badge badge-danger">Critical</span>
+                    {% elif task.priority == 2 %}
+                        <span class="badge badge-warning">High</span>
+                    {% elif task.priority == 3 %}
+                        <span class="badge badge-info">Medium</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">{{ task.story_points }}</td>
+                <td>{{ task.assigned_to.username|default:"Unassigned" }}</td>
+                <td>{{ task.completed_at|date:"M d, Y"|default:"N/A" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No completed tasks in this sprint.</p>
+    {% endif %}
+    
+    <!-- Incomplete Tasks -->
+    {% if incomplete_tasks %}
+    <h2>Incomplete Tasks ({{ incomplete_tasks.count }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th style="text-align: center;">Story Points</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in incomplete_tasks %}
+            <tr>
+                <td>
+                    {{ task.title }}
+                    {% if task.priority == 1 %}
+                        <span class="badge badge-danger">Critical</span>
+                    {% elif task.priority == 2 %}
+                        <span class="badge badge-warning">High</span>
+                    {% elif task.priority == 3 %}
+                        <span class="badge badge-info">Medium</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">{{ task.story_points }}</td>
+                <td>{{ task.get_status_display }}</td>
+                <td>{{ task.assigned_to.username|default:"Unassigned" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    
+    <div class="footer">
+        <p>Sprint Report Generated by PDMS - Project Development Management System</p>
+        <p>{{ generated_date|date:"F d, Y - g:i A" }}</p>
+    </div>
+</body>
+</html>

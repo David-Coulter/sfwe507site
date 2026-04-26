@@ -23,4 +23,8 @@ urlpatterns = [
     path('task_<int:pk>/pass-testing/', views.pass_testing, name='pass_testing'),
     path('task_<int:pk>/fail-testing/', views.fail_testing, name='fail_testing'),
     path('tasks/completed/', views.completed_tasks, name='completed_tasks'),
+    path('sprint_<int:sprint_pk>/report/', views.sprint_report, name='sprint_report'),
+    path('sprint_<int:sprint_pk>/report/export-csv/', views.export_sprint_report_csv, name='export_sprint_report_csv'),
+    path('sprint_<int:sprint_pk>/report/export-pdf/', views.export_sprint_report_pdf, name='export_sprint_report_pdf'),
+    path('sprint_<int:sprint_pk>/report/email/', views.email_sprint_report, name='email_sprint_report'),
 ]

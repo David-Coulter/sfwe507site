@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const taskId = descriptionDiv.getAttribute('data-task-id');
         const updatedMarkdown = rebuildMarkdownWithCheckboxes();
 
-        fetch(`/task/${taskId}/update-description/`, {
+        fetch(`/task_${taskId}/update-description/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
