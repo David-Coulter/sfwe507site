@@ -10,6 +10,9 @@
             <i class="bi bi-graph-down"></i> Sprint Burndown Chart
         </h1>
         <div>
+            <a href="{% url 'sprint_report' sprint.pk %}" class="btn btn-outline-info">
+                <i class="bi bi-file-earmark-text"></i> View SprintReport
+            </a>
             <a href="{% url 'sprint_board' sprint.pk %}" class="btn btn-outline-primary">
                 <i class="bi bi-kanban"></i> Sprint Board
             </a>
@@ -300,18 +303,4 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endif %}
 });
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.badge.bg-planning {
-    background-color: #0C234B !important;
-}
-.badge.bg-active {
-    background-color: #1E5288 !important;
-}
-.badge.bg-complete {
-    background-color: #6c757d !important;
-}
-</style>
 {% endblock %}

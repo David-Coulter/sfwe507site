@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sprint Report - {{ sprint.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header with Export Buttons -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-file-earmark-text"></i> Sprint Report
+        </h1>
+        <div>
+            <!-- Export Buttons -->
+            <a href="{% url 'export_sprint_report_pdf' sprint.pk %}" class="btn btn-danger" target="_blank">
+                <i class="bi bi-file-pdf"></i> Export PDF
+            </a>
+            <a href="{% url 'export_sprint_report_csv' sprint.pk %}" class="btn btn-success">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#emailModal">
+                <i class="bi bi-envelope"></i> Email Report
+            </button>
+            <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Sprint Selector -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <label for="sprint_select" class="form-label">Select Sprint</label>
+            <select class="form-select" id="sprint_select" onchange="window.location.href='/sprint_' + this.value + '/report/'">
+                {% for s in all_sprints %}
+                    <option value="{{ s.pk }}" {% if s.pk == sprint.pk %}selected{% endif %}>
+                        {{ s.name }}
+                        {% if s.start_date and s.end_date %}
+                            ({{ s.start_date|date:"M d" }} - {{ s.end_date|date:"M d, Y" }})
+                        {% endif %}
+                        - {{ s.get_status_display }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Sprint Summary Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="bi bi-info-circle"></i> Sprint Summary</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Sprint Name:</strong> {{ sprint.name }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge bg-{{ sprint.status|lower }}">{{ sprint.get_status_display }}</span>
+                    </p>
+                    {% if sprint.start_date and sprint.end_date %}
+                        <p><strong>Start Date:</strong> {{ sprint.start_date|date:"F d, Y" }}</p>
+                        <p><strong>End Date:</strong> {{ sprint.end_date|date:"F d, Y" }}</p>
+                        <p><strong>Duration:</strong> {{ sprint.start_date|timesince:sprint.end_date }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    {% if sprint.goal %}
+                        <p><strong>Sprint Goal:</strong></p>
+                        <p class="bg-light p-3 rounded">{{ sprint.goal }}</p>
+                    {% else %}
+                        <p class="text-muted"><em>No sprint goal defined</em></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Story Points Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center border-primary shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="text-muted mb-2">Total Planned</h5>
+                    <h2 class="display-5 text-primary">{{ total_story_points }}</h2>
+                    <p class="text-muted mb-0">Story Points</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-success shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="text-muted mb-2">Completed</h5>
+                    <h2 class="display-5 text-success">{{ completed_story_points }}</h2>
+                    <p class="text-muted mb-0">Story Points</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-warning shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="text-muted mb-2">Incomplete</h5>
+                    <h2 class="display-5 text-warning">{{ incomplete_story_points }}</h2>
+                    <p class="text-muted mb-0">Story Points</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-info shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="text-muted mb-2">Completion Rate</h5>
+                    <h2 class="display-5 text-info">{{ completion_rate }}%</h2>
+                    <p class="text-muted mb-0">Of Planned Work</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Status Breakdown (Pie Chart) -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Task Status Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusPieChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Team Member Contributions -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Team Member Contributions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Team Member</th>
+                                <th class="text-center">Tasks</th>
+                                <th class="text-center">Completed</th>
+                                <th class="text-center">Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in team_contributions %}
+                            <tr>
+                                <td><i class="bi bi-person-fill"></i> {{ member.name }}</td>
+                                <td class="text-center">{{ member.completed_tasks }}/{{ member.total_tasks }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-success">{{ member.completed_tasks }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <strong>{{ member.completed_points }}</strong>/{{ member.total_points }} pts
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No assigned team members</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed Tasks -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-check-circle"></i> Completed Tasks ({{ completed_tasks.count }})
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if completed_tasks %}
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Task</th>
+                            <th class="text-center">Story Points</th>
+                            <th>Assigned To</th>
+                            <th>Completed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in completed_tasks %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'task_detail' task.pk %}">{{ task.title }}</a>
+                                <br>
+                                <small class="text-muted">
+                                    {% if task.priority == 1 %}
+                                        <span class="badge bg-danger">Critical</span>
+                                    {% elif task.priority == 2 %}
+                                        <span class="badge bg-warning">High</span>
+                                    {% elif task.priority == 3 %}
+                                        <span class="badge bg-info">Medium</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Low</span>
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                            </td>
+                            <td>
+                                {% if task.assigned_to %}
+                                    <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                                {% else %}
+                                    <span class="text-muted">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if task.completed_at %}
+                                    <small>{{ task.completed_at|date:"M d, Y" }}</small>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> No completed tasks in this sprint.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Incomplete Tasks -->
+    {% if incomplete_tasks %}
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-warning">
+            <h5 class="mb-0">
+                <i class="bi bi-exclamation-triangle"></i> Incomplete Tasks ({{ incomplete_tasks.count }})
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Task</th>
+                        <th class="text-center">Story Points</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in incomplete_tasks %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'task_detail' task.pk %}">{{ task.title }}</a>
+                            <br>
+                            <small class="text-muted">
+                                {% if task.priority == 1 %}
+                                    <span class="badge bg-danger">Critical</span>
+                                {% elif task.priority == 2 %}
+                                    <span class="badge bg-warning">High</span>
+                                {% elif task.priority == 3 %}
+                                    <span class="badge bg-info">Medium</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Low</span>
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ task.get_status_display }}</span>
+                        </td>
+                        <td>
+                            {% if task.assigned_to %}
+                                <i class="bi bi-person"></i> {{ task.assigned_to.username }}
+                            {% else %}
+                                <span class="text-muted">Unassigned</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Email Modal -->
+<div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="emailModalLabel">
+                    <i class="bi bi-envelope"></i> Email Sprint Report
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'email_sprint_report' sprint.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="recipient_email" class="form-label">Recipient Email(s)</label>
+                        <input type="email" class="form-control" id="recipient_email" name="recipient_email" 
+                               placeholder="stakeholder@example.com" required multiple>
+                        <small class="text-muted">Separate multiple emails with commas</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email_message" class="form-label">Message (Optional)</label>
+                        <textarea class="form-control" id="email_message" name="email_message" rows="3" 
+                                  placeholder="Add a personal message..."></textarea>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> The sprint report summary will be attached as PDF.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i> Send Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Status Breakdown Pie Chart
+    const ctx = document.getElementById('statusPieChart').getContext('2d');
+    
+    const labels = {{ chart_labels|safe }};
+    const data = {{ chart_data|safe }};
+    const colors = {{ chart_colors|safe }};
+    
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += context.parsed + ' tasks';
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            label += ' (' + percentage + '%)';
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,2 +1,32 @@
+# Core Framework
 Django>=5.2,<5.3
+
+# Markdown Support
 markdown>=3.4.0
+
+# PDF Generation (US-23: Sprint Reports)
+weasyprint==60.1
+pydyf==0.8.0
+cffi>=1.0.0
+cairocffi>=0.9.0
+tinycss2>=1.0.0
+cssselect2>=0.1
+Pillow>=4.0.0
+
+# Note: WeasyPrint requires system-level dependencies:
+# 
+# On macOS (with Homebrew):
+#   brew install cairo pango gdk-pixbuf libffi
+#   pip install -r requirements.txt
+#
+# On Ubuntu/Debian:
+#   sudo apt-get install build-essential python3-dev python3-pip python3-setuptools \
+#     python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+#     libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
+#   pip install -r requirements.txt
+#
+# On Windows:
+#   1. Download GTK3 runtime from:
+#      https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
+#   2. Install GTK3
+#   3. pip install -r requirements.txt

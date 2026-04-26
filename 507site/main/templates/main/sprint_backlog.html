@@ -15,12 +15,6 @@
             <i class="bi bi-plus-circle"></i> Create Sprint
         </a>
         {% endif %}
-            <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-inbox"></i> Product Backlog
-            </a>
-            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-house"></i> Dashboard
-            </a>
         </div>
     </div>
 
@@ -66,7 +60,7 @@
                         </a>
                         {% if user.is_staff and sprint.status != 'COMPLETE' %}
                         <a href="{% url 'edit_sprint' sprint.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit Sprint">
-                            <i class="bi bi-pencil"></i>
+                            <i class="bi bi-pencil"></i> Edit Sprint
                         </a>
                         {% endif %}
                         {% if sprint.status == 'COMPLETE' and user.is_staff %}
@@ -74,8 +68,11 @@
                                 <i class="bi bi-arrow-counterclockwise"></i> Reopen
                             </a>
                         {% endif %}
-                        <a href="{% url 'sprint_burndown' sprint.pk %}" class="btn btn-sm btn-outline-info">
+                        <a href="{% url 'sprint_burndown' sprint.pk %}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-graph-down"></i> View Sprint Burndown Chart
+                        </a>
+                        <a href="{% url 'sprint_report' sprint.pk %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-file-earmark-text"></i> View Sprint Report
                         </a>
                     </div>
                 </div>
@@ -100,18 +97,4 @@
     </div>
     {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.badge.bg-planning {
-    background-color: #0C234B !important;
-}
-.badge.bg-active {
-    background-color: #1E5288 !important;
-}
-.badge.bg-complete {
-    background-color: #6c757d !important;
-}
-</style>
 {% endblock %}
