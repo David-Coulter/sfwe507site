@@ -18,17 +18,45 @@
             </p>
         </div>
         <div>
-            {% if user.is_staff and sprint.status != 'COMPLETE' %}
-            <a href="{% url 'edit_sprint' sprint.pk %}" class="btn btn-outline-primary">
-                <i class="bi bi-pencil"></i> Edit Sprint
-            </a>
+            <!-- Sprint Management Buttons (Staff Only) -->
+            {% if user.is_staff %}
+                {% if sprint.status == 'COMPLETE' %}
+                    <!-- COMPLETE Sprint Actions -->
+                    <a href="{% url 'reopen_sprint' sprint.pk %}" class="btn btn-warning">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reopen Sprint
+                    </a>
+                {% else %}
+                    <!-- ACTIVE/PLANNING Sprint Actions -->
+                    <a href="{% url 'edit_sprint' sprint.pk %}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit Sprint
+                    </a>
+                    
+                    {% if sprint.status == 'ACTIVE' %}
+                        {% if sprint.end_date %}
+                            {% now "Y-m-d" as today %}
+                            {% if sprint.end_date|date:"Y-m-d" <= today %}
+                                <a href="{% url 'complete_sprint' sprint.pk %}" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> Complete Sprint
+                                </a>
+                            {% else %}
+                                <button class="btn btn-secondary" disabled title="Sprint end date has not passed yet">
+                                    <i class="bi bi-lock"></i> Complete ({{ sprint.end_date|date:"M d" }})
+                                </button>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'complete_sprint' sprint.pk %}" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Complete Sprint
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
             {% endif %}
-            {% if user.is_staff and sprint.status == 'ACTIVE' %}
-            <a href="{% url 'complete_sprint' sprint.pk %}" class="btn btn-success">
-                <i class="bi bi-check-circle"></i> Complete Sprint
+            
+            <!-- Navigation Buttons (All Users) -->
+            <a href="{% url 'sprint_burndown' sprint.pk %}" class="btn btn-outline-info">
+                <i class="bi bi-graph-down"></i> Burndown Chart
             </a>
-            {% endif %}
-            <a href ="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
+            <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar3"></i> Sprint Backlog
             </a>
             <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">

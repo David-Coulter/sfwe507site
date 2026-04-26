@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+
+{% block title %}Sprint Burndown - {{ sprint.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-graph-down"></i> Sprint Burndown Chart
+        </h1>
+        <div>
+            <a href="{% url 'sprint_board' sprint.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-kanban"></i> Sprint Board
+            </a>
+            <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Sprint Backlog
+            </a>
+        </div>
+    </div>
+
+    <!-- Sprint Selector -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{% url 'sprint_burndown' sprint.pk %}" class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label for="sprint_select" class="form-label">Select Sprint</label>
+                    <select class="form-select" id="sprint_select" onchange="window.location.href='/sprint_' + this.value + '/burndown/'">
+                        {% for s in all_sprints %}
+                            <option value="{{ s.pk }}" {% if s.pk == sprint.pk %}selected{% endif %}>
+                                {{ s.name }} 
+                                {% if s.start_date and s.end_date %}
+                                    ({{ s.start_date|date:"M d" }} - {{ s.end_date|date:"M d, Y" }})
+                                {% endif %}
+                                - {{ s.get_status_display }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if error %}
+        <!-- Error State -->
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> {{ error }}
+            <p class="mb-0 mt-2">
+                Please set start and end dates for this sprint to view the burndown chart.
+                {% if user.is_staff %}
+                    <a href="{% url 'edit_sprint' sprint.pk %}" class="btn btn-sm btn-warning ms-2">
+                        <i class="bi bi-pencil"></i> Edit Sprint
+                    </a>
+                {% endif %}
+            </p>
+        </div>
+    {% else %}
+        <!-- Sprint Status Banner -->
+        {% if status == 'ahead' %}
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle-fill"></i> <strong>Great progress!</strong> {{ status_message }}
+        </div>
+        {% elif status == 'behind' %}
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle-fill"></i> <strong>Attention needed!</strong> {{ status_message }}
+        </div>
+        {% elif status == 'on-track' %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle-fill"></i> {{ status_message }}
+        </div>
+        {% elif status == 'completed' %}
+        <div class="alert alert-success">
+            <i class="bi bi-trophy-fill"></i> <strong>Sprint Complete!</strong> {{ status_message }}
+        </div>
+        {% elif status == 'not-started' %}
+        <div class="alert alert-warning">
+            <i class="bi bi-clock-fill"></i> <strong>Upcoming Sprint</strong> {{ status_message }}
+        </div>
+        {% endif %}
+
+        <!-- Sprint Summary Metrics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm">
+                    <div class="card-body">
+                        <h5 class="text-muted mb-2">Total Story Points</h5>
+                        <h2 class="display-5 text-primary">{{ total_story_points }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm">
+                    <div class="card-body">
+                        <h5 class="text-muted mb-2">Completed Tasks</h5>
+                        <h2 class="display-5 text-success">{{ completed_tasks }}/{{ total_tasks }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm">
+                    <div class="card-body">
+                        <h5 class="text-muted mb-2">Completion %</h5>
+                        <h2 class="display-5 text-info">{{ completion_percentage }}%</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center shadow-sm">
+                    <div class="card-body">
+                        <h5 class="text-muted mb-2">Sprint Status</h5>
+                        <h3 class="{% if status == 'ahead' %}text-success{% elif status == 'behind' %}text-danger{% else %}text-primary{% endif %}">
+                            {% if status == 'ahead' %}
+                                <i class="bi bi-arrow-up-circle"></i> Ahead
+                            {% elif status == 'behind' %}
+                                <i class="bi bi-arrow-down-circle"></i> Behind
+                            {% elif status == 'on-track' %}
+                                <i class="bi bi-check-circle"></i> On Track
+                            {% endif %}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Burndown Chart -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-down"></i> {{ sprint.name }} - Burndown Chart
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="burndownChart" height="80"></canvas>
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Blue line:</strong> Ideal burndown (linear progression)
+                    &nbsp;|&nbsp;
+                    <strong>Red line:</strong> Actual burndown (based on completed tasks)
+                    &nbsp;|&nbsp;
+                    <strong>Gray areas:</strong> Weekends
+                </small>
+            </div>
+        </div>
+
+        <!-- Sprint Details -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-calendar"></i> Sprint Timeline</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Start Date:</strong> {{ sprint.start_date|date:"F d, Y" }}</p>
+                        <p><strong>End Date:</strong> {{ sprint.end_date|date:"F d, Y" }}</p>
+                        <p><strong>Duration:</strong> {{ sprint.start_date|timesince:sprint.end_date }}</p>
+                        {% if sprint.goal %}
+                            <p class="mb-0"><strong>Sprint Goal:</strong> {{ sprint.goal }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Quick Stats</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Status:</strong> 
+                            <span class="badge bg-{{ sprint.status|lower }}">{{ sprint.get_status_display }}</span>
+                        </p>
+                        <p><strong>Total Tasks:</strong> {{ total_tasks }}</p>
+                        <p><strong>Completed Tasks:</strong> {{ completed_tasks }}</p>
+                        <p class="mb-0"><strong>Story Points Committed:</strong> {{ total_story_points }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if not error %}
+    const ctx = document.getElementById('burndownChart').getContext('2d');
+    
+    // Parse data from Django
+    const labels = {{ chart_labels|safe }};
+    const idealData = {{ ideal_burndown|safe }};
+    const actualData = {{ actual_burndown|safe }};
+    const weekendIndices = {{ weekend_indices|safe }};
+    
+    // Create background plugin for weekends
+    const weekendPlugin = {
+        id: 'weekendBackground',
+        beforeDraw: (chart) => {
+            const ctx = chart.ctx;
+            const chartArea = chart.chartArea;
+            const meta = chart.getDatasetMeta(0);
+            
+            weekendIndices.forEach(index => {
+                if (index < meta.data.length) {
+                    const x = meta.data[index].x;
+                    const width = index < meta.data.length - 1 ? 
+                        meta.data[index + 1].x - x : 
+                        chartArea.right - x;
+                    
+                    ctx.fillStyle = 'rgba(200, 200, 200, 0.2)';
+                    ctx.fillRect(x - width/2, chartArea.top, width, chartArea.bottom - chartArea.top);
+                }
+            });
+        }
+    };
+    
+    // Create the chart
+    const burndownChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ideal Burndown',
+                    data: idealData,
+                    borderColor: 'rgb(54, 162, 235)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0
+                },
+                {
+                    label: 'Actual Burndown',
+                    data: actualData,
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += Math.round(context.parsed.y) + ' story points';
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Story Points Remaining'
+                    },
+                    ticks: {
+                        stepSize: 5
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Sprint Days'
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        },
+        plugins: [weekendPlugin]
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.badge.bg-planning {
+    background-color: #0C234B !important;
+}
+.badge.bg-active {
+    background-color: #1E5288 !important;
+}
+.badge.bg-complete {
+    background-color: #6c757d !important;
+}
+</style>
+{% endblock %}

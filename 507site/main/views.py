@@ -3,10 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils import timezone
+from datetime import timedelta, datetime
 from django.http import JsonResponse
-from django.db.models import Sum, Count, Q
-from .models import Task, Comment, TaskHistory, Sprint
+from django.db.models import Sum
+from django.db import models
+from main.models import Task, Comment, TaskHistory, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
+from collections import defaultdict
 import json
 
 
@@ -340,6 +343,17 @@ def complete_sprint(request, sprint_pk):
     if sprint.status != 'ACTIVE':
         messages.error(request, f'Only active sprints can be completed. {sprint.name} is {sprint.get_status_display()}.')
         return redirect('sprint_board', sprint_pk=sprint.pk)
+    
+    today = timezone.now().date()
+    if sprint.end_date and today < sprint.end_date:
+        days_remaining = (sprint.end_date - today).days
+        messages.error(
+            request, 
+            f'Cannot complete {sprint.name} yet. The sprint ends on {sprint.end_date.strftime("%B %d, %Y")} '
+            f'({days_remaining} day{"s" if days_remaining != 1 else ""} remaining). '
+            f'Please wait until the sprint end date or update the sprint dates if needed.'
+        )
+        return redirect('sprint_board', sprint_pk=sprint.pk)
 
     all_tasks = Task.objects.filter(sprint=sprint)
     done_tasks = all_tasks.filter(sprint_progress='DONE')
@@ -447,6 +461,63 @@ def complete_sprint(request, sprint_pk):
 
     return render(request, 'main/complete_sprint.html', context)
 
+@staff_member_required
+def reopen_sprint(request, sprint_pk):
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+    
+    if sprint.status != 'COMPLETE':
+        messages.error(request, f'{sprint.name} is not completed, cannot reopen.')
+        return redirect('sprint_backlog')
+    
+    if request.method == 'POST':
+        # Revert sprint status
+        sprint.status = 'ACTIVE'
+        sprint.save()
+    
+        # Find tasks that were marked complete during this sprint completion and change them back to the SPRINT status
+        completed_tasks = Task.objects.filter(
+            sprint=sprint,
+            status='COMPLETE'
+        )
+
+        tasks_reverted = 0
+                
+        for task in completed_tasks:
+            old_tasks_status = task.get_status_display()
+            task.status = 'SPRINT'
+            task.sprint_progress = 'DONE'
+            task.completed_at = None
+            task.save()
+
+            log_task_history(
+                task=task,
+                field_changed='Status',
+                old_value=old_tasks_status,
+                new_value=task.get_status_display(),
+                changed_by=request.user,
+                notes=f'Sprint {sprint.name} was reopened'
+            )
+
+            tasks_reverted += 1
+        
+        messages.warning(
+            request,
+            f'{sprint.name} has been reopened. {tasks_reverted} task{"s" if tasks_reverted != 1 else ""} '
+            f'reverted to SPRINT status with DONE progress.'
+        )
+        return redirect('sprint_board', sprint_pk=sprint.pk)
+    
+    completed_tasks = Task.objects.filter(
+        sprint=sprint,
+        status='COMPLETE'
+    )
+
+    context = {
+        'sprint': sprint,
+        'completed_tasks': completed_tasks.count(),
+    }
+
+    return render(request, 'main/reopen_sprint_confirm.html', context)
 
 @login_required
 def move_to_sprint(request, task_pk, sprint_pk):
@@ -516,6 +587,124 @@ def update_sprint_progress(request, task_pk, new_progress):
 
     return redirect('sprint_board', sprint_pk=task.sprint.pk)
 
+@login_required
+def sprint_burndown(request, sprint_pk):
+    sprint = get_object_or_404(Sprint, pk=sprint_pk)
+
+    # Get all tasks in SPRINT status
+    all_sprints = Sprint.objects.all().order_by('-created_at')
+    
+    #Validate that the sprint has dates
+    if not sprint.start_date or not sprint.end_date:
+        context = {
+            'sprint': sprint,
+            'all_sprints': all_sprints,
+            'error': 'Sprint must have start and end dates to view the display the sprint burdown chart.'}
+        
+        return render(request, 'main/sprint_burndown.html', context)
+    
+    # Calculate metrics
+    total_story_points = Task.objects.filter(sprint=sprint).aggregate(
+        total=models.Sum('story_points')
+    )['total'] or 0
+
+    # Create the date range for the sprint
+    current_date = sprint.start_date
+    sprint_days = []
+    while current_date <= sprint.end_date:
+        sprint_days.append(current_date)
+        current_date += timedelta(days=1)
+
+    total_days = len(sprint_days)
+
+    # Calculate the ideal burndown
+    ideal_burndown = []
+    if total_days > 0:
+        daily_decrease = total_story_points / total_days
+        for i, day in enumerate(sprint_days):
+            remaining = total_story_points - (daily_decrease * (i + 1))
+            ideal_burndown.append(max(0, remaining))
+
+    #Calculate the actual burndown based on the task completion
+    actual_burndown = []
+
+    for day in sprint_days:
+        day_end = datetime.combine(day, datetime.max.time())
+        day_end = timezone.make_aware(day_end) if timezone.is_naive(day_end) else day_end
+
+        completed_points = Task.objects.filter(
+            sprint=sprint,
+            status='COMPLETE',
+            completed_at__lte=day_end
+        ).aggregate(total=models.Sum('story_points'))['total'] or 0
+
+        remaining = total_story_points - completed_points
+        actual_burndown.append(max(0, remaining))
+        
+    chart_labels = [day.strftime('%b %d') for day in sprint_days]
+
+    weekend_indices = [i for i, day in enumerate(sprint_days) if day.weekday() >= 5]
+
+    today = timezone.now().date()
+    status = 'on-track'
+    status_message = ''
+
+    if today < sprint.start_date:
+        # Sprint hasn't started yet
+        status = 'not-started'
+        days_until_start = (sprint.start_date - today).days
+        status_message = f'Sprint has not started yet. It begins in {days_until_start} day{"s" if days_until_start != 1 else ""}.'
+
+    elif today > sprint.end_date:
+        # Sprint is complete
+        status = 'completed'
+        final_remaining = actual_burndown[-1] if actual_burndown else 0
+        
+        if final_remaining == 0:
+            status_message = f'Sprint completed successfully! All {total_story_points} story points were delivered. 🎉'
+        else:
+            completed_points = total_story_points - final_remaining
+            completion_rate = (completed_points / total_story_points * 100) if total_story_points > 0 else 0
+            status_message = f'Sprint completed. Delivered {int(completed_points)} of {total_story_points} story points ({completion_rate:.1f}% completion).'
+
+    else:
+        # Sprint is active
+        days_elapsed = (today - sprint.start_date).days
+        if days_elapsed < len(ideal_burndown) and days_elapsed < len(actual_burndown):
+            ideal_at_today = ideal_burndown[days_elapsed]
+            actual_at_today = actual_burndown[days_elapsed]
+            
+            if actual_at_today > ideal_at_today + 5:  # 5 point buffer
+                status = 'behind'
+                status_message = f'Sprint is behind schedule by approximately {int(actual_at_today - ideal_at_today)} story points.'
+            elif actual_at_today < ideal_at_today - 5:
+                status = 'ahead'
+                status_message = f'Sprint is ahead of schedule by approximately {int(ideal_at_today - actual_at_today)} story points.'
+            else:
+                status = 'on-track'
+                status_message = 'Sprint is on track!'
+
+    # Calculate sprint statistics
+    completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
+    total_tasks = Task.objects.filter(sprint=sprint).count()
+    completion_percentage = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
+
+    context = {
+        'sprint': sprint,
+        'all_sprints': all_sprints,
+        'total_story_points': total_story_points,
+        'completed_tasks': completed_tasks,
+        'total_tasks': total_tasks,
+        'completion_percentage': round(completion_percentage, 1),
+        'chart_labels': json.dumps(chart_labels),
+        'ideal_burndown': json.dumps(ideal_burndown),
+        'actual_burndown': json.dumps(actual_burndown),
+        'weekend_indices': json.dumps(weekend_indices),
+        'status': status,
+        'status_message': status_message
+    }
+
+    return render(request, 'main/sprint_burndown.html', context)  
 
 @login_required
 def testing_queue(request):

@@ -62,13 +62,21 @@
                 <div class="card-footer">
                     <div class="d-flex gap-2">
                         <a href="{% url 'sprint_board' sprint.pk %}" class="btn btn-sm btn-primary flex-grow-1">
-                            <i class="bi bi-kanban"></i> View Board
+                            <i class="bi bi-kanban"></i> View Sprint Board
                         </a>
                         {% if user.is_staff and sprint.status != 'COMPLETE' %}
                         <a href="{% url 'edit_sprint' sprint.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit Sprint">
                             <i class="bi bi-pencil"></i>
                         </a>
                         {% endif %}
+                        {% if sprint.status == 'COMPLETE' and user.is_staff %}
+                            <a href="{% url 'reopen_sprint' sprint.pk %}" class="btn btn-sm btn-warning" title="Reopen Sprint">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reopen
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'sprint_burndown' sprint.pk %}" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-graph-down"></i> View Sprint Burndown Chart
+                        </a>
                     </div>
                 </div>
             </div>

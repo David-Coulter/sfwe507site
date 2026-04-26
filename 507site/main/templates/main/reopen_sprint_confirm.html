@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Reopen Sprint - {{ sprint.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title">
+            <i class="bi bi-arrow-counterclockwise text-warning"></i> Reopen Sprint
+        </h1>
+        <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-x"></i> Cancel
+        </a>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="alert alert-warning">
+        <h4 class="alert-heading">
+            <i class="bi bi-exclamation-triangle-fill"></i> Warning: Sprint Reopening
+        </h4>
+        <p>
+            You are about to reopen <strong>{{ sprint.name }}</strong>. This action will:
+        </p>
+        <ul class="mb-0">
+            <li>Change the sprint status from <strong>COMPLETE</strong> back to <strong>ACTIVE</strong></li>
+            <li>Revert <strong>{{ completed_tasks_count }} completed task{{ completed_tasks_count|pluralize }}</strong> back to SPRINT status</li>
+            <li>Set all reverted tasks to <strong>DONE</strong> progress</li>
+            <li>Clear completion timestamps from all tasks</li>
+            <li>Allow tasks to be moved or modified again</li>
+        </ul>
+    </div>
+
+    <!-- Sprint Info -->
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-info-circle"></i> Sprint Information
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Sprint Name:</strong> {{ sprint.name }}</p>
+                    <p><strong>Current Status:</strong> 
+                        <span class="badge bg-secondary">{{ sprint.get_status_display }}</span>
+                    </p>
+                    {% if sprint.start_date and sprint.end_date %}
+                        <p><strong>Dates:</strong> {{ sprint.start_date|date:"M d, Y" }} - {{ sprint.end_date|date:"M d, Y" }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    {% if sprint.goal %}
+                        <p><strong>Sprint Goal:</strong> {{ sprint.goal }}</p>
+                    {% endif %}
+                    <p><strong>Tasks to Revert:</strong> {{ completed_tasks_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Notes -->
+    <div class="alert alert-info">
+        <h5><i class="bi bi-lightbulb"></i> Important Notes</h5>
+        <ul class="mb-0">
+            <li><strong>Use this only for error correction:</strong> If the sprint was completed by mistake or too early</li>
+            <li><strong>Affects metrics:</strong> Reopening may impact velocity calculations and burndown charts</li>
+            <li><strong>All changes are logged:</strong> Task history will show the reopen action</li>
+            <li><strong>Consider alternatives:</strong> For new work, create a new sprint instead</li>
+        </ul>
+    </div>
+
+    <!-- Confirmation Form -->
+    <div class="card border-danger">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="text-danger mb-2">Confirm Sprint Reopening</h5>
+                        <p class="text-muted mb-0">
+                            This action can be undone by completing the sprint again.
+                        </p>
+                    </div>
+                    <div>
+                        <a href="{% url 'sprint_backlog' %}" class="btn btn-secondary me-2">
+                            <i class="bi bi-x"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reopen Sprint
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
