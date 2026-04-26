@@ -14,8 +14,22 @@
 
     <!-- Warning Alert -->
     <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <strong>Warning:</strong> This action will close the sprint and cannot be undone.
+        <h4 class="alert-heading">
+            <i class="bi bi-exclamation-triangle-fill"></i> Complete Sprint Confirmation
+        </h4>
+        <p>
+            You are about to complete <strong>{{ sprint.name }}</strong>. This action will:
+        </p>
+        <ul class="mb-0">
+            <li>Mark all tasks with <strong>DONE</strong> status as <strong>COMPLETE</strong></li>
+            <li>Move unfinished tasks according to your selection below</li>
+            <li>Change the sprint status to <strong>COMPLETE</strong></li>
+        </ul>
+        <p class="mt-2 mb-0">
+            <small class="text-muted">
+                <i class="bi bi-info-circle"></i> You can reopen this sprint later if absolutely necessary, but this is not recommended as it affects velocity metrics and sprint history.
+            </small>
+        </p>
     </div>
 
     <!-- Sprint Summary -->
