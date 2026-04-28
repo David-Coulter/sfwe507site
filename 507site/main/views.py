@@ -13,10 +13,18 @@ from django.db import models
 from main.models import Task, Comment, TaskHistory, Sprint
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
 from django.template.loader import render_to_string
-from django.template.loader import render_to_string
 from collections import defaultdict
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
+try:
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+except ImportError:
+    HTML = None
+    CSS = None
+    FontConfiguration = None
+except OSError:
+    HTML = None
+    CSS = None
+    FontConfiguration = None
 import csv
 import json
 
@@ -60,12 +68,34 @@ def dashboard(request):
 
     my_tasks = Task.objects.filter(assigned_to=request.user).exclude(status='COMPLETE')
 
+    active_sprint = Sprint.objects.filter(status='ACTIVE').first()
+
+    active_sprint_tasks = Task.objects.none()
+    active_sprint_total_tasks = 0
+    active_sprint_complete_tasks = 0
+    active_sprint_testing_tasks = 0
+    
+    testing_attention_tasks = Task.objects.filter(
+        status='TESTING'
+    ).order_by('moved_to_testing_at')[:5]
+
+    if active_sprint:
+        active_sprint_tasks = Task.objects.filter(sprint=active_sprint)
+        active_sprint_total_tasks = active_sprint_tasks.count()
+        active_sprint_complete_tasks = active_sprint_tasks.filter(status='COMPLETE').count()
+        active_sprint_testing_tasks = active_sprint_tasks.filter(status='TESTING').count()
+
     context = {
         'backlog_count': backlog_count,
         'sprint_count': sprint_count,
         'testing_count': testing_count,
         'complete_count': complete_count,
         'my_tasks': my_tasks,
+        'active_sprint': active_sprint,
+        'active_sprint_total_tasks': active_sprint_total_tasks,
+        'active_sprint_complete_tasks': active_sprint_complete_tasks,
+        'active_sprint_testing_tasks': active_sprint_testing_tasks,
+        'testing_attention_tasks': testing_attention_tasks,
     }
     return render(request, 'main/dashboard.html', context)
 
