@@ -111,13 +111,19 @@
                 <div class="card text-center shadow-sm">
                     <div class="card-body">
                         <h5 class="text-muted mb-2">Sprint Status</h5>
-                        <h3 class="{% if status == 'ahead' %}text-success{% elif status == 'behind' %}text-danger{% else %}text-primary{% endif %}">
+                        <h3 class="display-5 {% if status == 'ahead' %}text-success{% elif status == 'behind' %}text-danger{% elif status == 'completed' %}text-info{% elif status == 'not-started' %}text-secondary{% else %}text-primary{% endif %}">
                             {% if status == 'ahead' %}
                                 <i class="bi bi-arrow-up-circle"></i> Ahead
                             {% elif status == 'behind' %}
                                 <i class="bi bi-arrow-down-circle"></i> Behind
                             {% elif status == 'on-track' %}
                                 <i class="bi bi-check-circle"></i> On Track
+                            {% elif status == 'completed' %}
+                                <i class="bi bi-flag-fill"></i> Complete
+                            {% elif status == 'not-started' %}
+                                <i class="bi bi-hourglass"></i> Not Started
+                            {% else %}
+                                <i class="bi bi-question-circle"></i> Unknown
                             {% endif %}
                         </h3>
                     </div>

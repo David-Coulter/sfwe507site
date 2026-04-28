@@ -54,7 +54,7 @@ def register(request):
 @login_required
 def dashboard(request):
     backlog_count = Task.objects.filter(status='BACKLOG').count()
-    sprint_count = Task.objects.filter(status='SPRINT').count()
+    sprint_count = Sprint.objects.exclude(status='COMPLETE').count()
     testing_count = Task.objects.filter(status='TESTING').count()
     complete_count = Task.objects.filter(status='COMPLETE').count()
 
@@ -227,8 +227,7 @@ def update_task_description(request, pk):
 
 @login_required
 def product_backlog(request):
-    backlog_tasks = Task.objects.filter(status='BACKLOG').order_by('priority', '-created_at')
-
+    backlog_tasks = Task.objects.filter(sprint__isnull=True, status='BACKLOG')
     active_sprints = Sprint.objects.filter(status='ACTIVE').order_by('name')
     planning_sprints = Sprint.objects.filter(status='PLANNING').order_by('name')
     sprints = list(active_sprints) + list(planning_sprints)
@@ -386,36 +385,38 @@ def complete_sprint(request, sprint_pk):
                     changed_by=request.user
                 )
 
-            done_tasks = all_tasks.filter(sprint_progress='DONE')
-            unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
+        done_tasks_list = list(all_tasks.filter(sprint_progress='DONE'))
+        unfinished_tasks_list = list(all_tasks.exclude(sprint_progress='DONE'))
 
-        for task in done_tasks:
+        for task in done_tasks_list:
             old_status = task.get_status_display()
             old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
-
+            
             task.status = 'COMPLETE'
             task.sprint_progress = None
+            task.planned_sprint = sprint
             task.completed_at = timezone.now()
             task.save()
-
+            
             log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
             log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
 
         if unfinished_action == 'backlog':
-            for task in unfinished_tasks:
+            for task in unfinished_tasks_list:
                 old_sprint = task.sprint.name if task.sprint else ''
                 old_status = task.get_status_display()
                 old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
-
-                task.sprint = None
+                
                 task.status = 'BACKLOG'
                 task.sprint_progress = None
+                task.planned_sprint = sprint
+                task.sprint = None
                 task.save()
-
+                
                 log_task_history(task, 'Sprint', old_sprint, '', request.user)
                 log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
                 log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
-
+            
             unfinished_msg = "returned to Product Backlog"
 
         elif unfinished_action == 'sprint' and target_sprint_id:
@@ -540,7 +541,8 @@ def move_to_sprint(request, task_pk, sprint_pk):
     old_status = task.get_status_display()
     old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
-    task.sprint = sprint
+    task.sprint = target_sprint
+    task.planned_sprint = target_sprint 
     task.status = 'SPRINT'
     task.sprint_progress = 'NOT_STARTED'
     task.save()
@@ -694,7 +696,8 @@ def sprint_burndown(request, sprint_pk):
 
     # Calculate sprint statistics
     completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
-    total_tasks = Task.objects.filter(sprint=sprint).count()
+    total_tasks = Task.objects.filter(planned_sprint=sprint).count()
+    completed_tasks = Task.objects.filter(planned_sprint=sprint, status='COMPLETE').count()
     completion_percentage = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
 
     context = {
