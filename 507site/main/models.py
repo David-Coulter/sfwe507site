@@ -89,6 +89,18 @@ class Task(models.Model):
     
     def __str__(self):
         return f"{self.title} [{self.get_status_display()}]"
+        
+    @property
+    def actual_hours(self):
+        return sum(
+            entry.hours_spent for entry in self.time_entries.all()
+        ) or 0
+
+    @property
+    def hours_variance(self):
+        if self.estimated_hours:
+            return self.actual_hours - self.estimated_hours
+        return None
 
 
 class Comment(models.Model):
@@ -140,6 +152,7 @@ class Sprint(models.Model):
         return self.task_set.filter(status='COMPLETE').count()
 
 
+
 class TaskHistory(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='history')
     field_changed = models.CharField(max_length=100)
@@ -154,3 +167,32 @@ class TaskHistory(models.Model):
 
     def __str__(self):
         return f"{self.task.title} - {self.field_changed} changed"
+
+
+class TimeEntry(models.Model):
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name='time_entries'
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+    hours_spent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2
+    )
+    notes = models.TextField(
+        blank=True
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.hours_spent}h on {self.task.title}"
+       

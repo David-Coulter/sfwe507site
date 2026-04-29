@@ -10,8 +10,8 @@ from django.http import HttpResponse, JsonResponse
 from django.db.models import Sum, Count, Q
 from django.contrib.auth.models import User
 from django.db import models
-from main.models import Task, Comment, TaskHistory, Sprint
-from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
+from main.models import Task, Comment, TaskHistory, Sprint, TimeEntry
+from .forms import TaskForm, CommentForm, RegisterForm, SprintForm, TimeEntryForm
 from django.template.loader import render_to_string
 from collections import defaultdict
 try:
@@ -98,6 +98,38 @@ def dashboard(request):
         'testing_attention_tasks': testing_attention_tasks,
     }
     return render(request, 'main/dashboard.html', context)
+    
+@login_required
+def log_time_entry(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+
+    if task.assigned_to != request.user:
+        messages.error(request, "Only the assigned user can log time.")
+        return redirect('task_detail', pk=task.pk)
+
+    if request.method == 'POST':
+        form = TimeEntryForm(request.POST)
+
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.task = task
+            entry.user = request.user
+            entry.save()
+
+            messages.success(request, "Time entry logged successfully.")
+            return redirect('task_detail', pk=task.pk)
+
+    else:
+        form = TimeEntryForm()
+
+    return render(
+        request,
+        'main/log_time_entry.html',
+        {
+            'task': task,
+            'form': form
+        }
+    )
 
 
 @login_required
