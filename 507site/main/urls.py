@@ -28,4 +28,5 @@ urlpatterns = [
     path('sprint_<int:sprint_pk>/report/export-csv/', views.export_sprint_report_csv, name='export_sprint_report_csv'),
     path('sprint_<int:sprint_pk>/report/export-pdf/', views.export_sprint_report_pdf, name='export_sprint_report_pdf'),
     path('sprint_<int:sprint_pk>/report/email/', views.email_sprint_report, name='email_sprint_report'),
+    path('accounts/reset/demo-token/', views.password_reset_demo_confirm, name='password_reset_demo_confirm'),
 ]
