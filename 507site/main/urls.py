@@ -1,9 +1,23 @@
 from django.urls import path
+from django.contrib.auth.views import (
+    PasswordResetView,
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
+)
+
 from . import views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('register/', views.register, name='register'),
+
+    path('accounts/password_reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('accounts/password_reset/done/', PasswordResetDoneView.as_view(), name='password_reset_done'),
+    path('accounts/reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('accounts/reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path('accounts/reset/demo-token/', views.password_reset_demo_confirm, name='password_reset_demo_confirm'),
+
     path('task_<int:pk>/view/', views.task_detail, name='task_detail'),
     path('task_<int:pk>/edit/', views.edit_task, name='edit_task'),
     path('task/create/', views.create_task, name='create_task'),
@@ -28,5 +42,4 @@ urlpatterns = [
     path('sprint_<int:sprint_pk>/report/export-csv/', views.export_sprint_report_csv, name='export_sprint_report_csv'),
     path('sprint_<int:sprint_pk>/report/export-pdf/', views.export_sprint_report_pdf, name='export_sprint_report_pdf'),
     path('sprint_<int:sprint_pk>/report/email/', views.email_sprint_report, name='email_sprint_report'),
-    path('accounts/reset/demo-token/', views.password_reset_demo_confirm, name='password_reset_demo_confirm'),
 ]
