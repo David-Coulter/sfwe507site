@@ -15,6 +15,8 @@ from .forms import TaskForm, CommentForm, RegisterForm, SprintForm, TimeEntryFor
 from django.template.loader import render_to_string
 from collections import defaultdict
 from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.views import LoginView
+
 try:
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
@@ -28,6 +30,29 @@ except OSError:
     FontConfiguration = None
 import csv
 import json
+
+class RememberMeLoginView(LoginView):
+    template_name = "registration/login.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["remembered_username"] = self.request.COOKIES.get("remembered_username", "")
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        if self.request.POST.get("remember_me"):
+            response.set_cookie(
+                "remembered_username",
+                form.get_user().get_username(),
+                max_age=60 * 60 * 24 * 30,
+                samesite="Lax",
+            )
+        else:
+            response.delete_cookie("remembered_username")
+
+        return response
 
 
 def log_task_history(task, field_changed, old_value, new_value, changed_by, notes=''):
@@ -517,7 +542,8 @@ def complete_sprint(request, sprint_pk):
                 old_status = task.get_status_display()
                 old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
-                task.sprint = target_sprint
+                task.sprint = sprint
+                task.planned_sprint = sprint
                 task.status = 'SPRINT'
                 task.sprint_progress = 'NOT_STARTED'
                 task.save()
