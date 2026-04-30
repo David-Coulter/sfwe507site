@@ -14,6 +14,7 @@ from main.models import Task, Comment, TaskHistory, Sprint, TimeEntry
 from .forms import TaskForm, CommentForm, RegisterForm, SprintForm, TimeEntryForm
 from django.template.loader import render_to_string
 from collections import defaultdict
+from django.contrib.auth.forms import SetPasswordForm
 try:
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
@@ -58,7 +59,35 @@ def register(request):
 
     return render(request, 'registration/register.html', {'form': form})
 
+def password_reset_demo_confirm(request):
+    user = User.objects.first()
 
+    if not user:
+        messages.error(request, "No user available for password reset.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = SetPasswordForm(user, request.POST)
+
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                'Your password has been reset successfully.'
+            )
+            return redirect('password_reset_complete')
+
+    else:
+        form = SetPasswordForm(user)
+
+    return render(
+        request,
+        'registration/password_reset_confirm.html',
+        {
+            'form': form
+        }
+    )
+    
 @login_required
 def dashboard(request):
     backlog_count = Task.objects.filter(status='BACKLOG').count()
