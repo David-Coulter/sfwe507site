@@ -75,7 +75,16 @@ class Task(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='tasks'
+        related_name='tasks',
+        help_text='Current sprint this task is assigned to'
+    )
+    planned_sprint = models.ForeignKey(
+        'Sprint',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='planned_tasks',
+        help_text='Sprint this task was originally planned for (for metrics)'
     )
 
     # Test Progress
