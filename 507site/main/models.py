@@ -47,7 +47,7 @@ class Task(models.Model):
         choices=PRIORITY_CHOICES,
         default=3
     )
-    story_points = models.PositiveIntegerField(default=1)
+    story_points = models.IntegerField(null=True, blank=True)
     estimated_hours = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     
     # Assignment

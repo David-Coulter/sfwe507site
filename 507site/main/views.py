@@ -758,8 +758,8 @@ def sprint_burndown(request, sprint_pk):
 
     # Calculate sprint statistics
     completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
-    total_tasks = Task.objects.filter(planned_sprint=sprint).count()
-    completed_tasks = Task.objects.filter(planned_sprint=sprint, status='COMPLETE').count()
+    total_tasks = Task.objects.filter(sprint=sprint).count()
+    completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
     completion_percentage = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
 
     context = {
@@ -1163,6 +1163,14 @@ def export_sprint_report_csv(request, sprint_pk):
  
 @login_required
 def export_sprint_report_pdf(request, sprint_pk):
+
+    if HTML is None or FontConfiguration is None:
+        response = HttpResponse(
+            b'PDF export is unavailable because WeasyPrint is not installed correctly.',
+            content_type='application/pdf'
+        )
+        response['Content-Disposition'] = f'attachment; filename="sprint_report_{sprint_pk}.pdf"'
+        return response
     
     sprint = get_object_or_404(Sprint, pk=sprint_pk)
     

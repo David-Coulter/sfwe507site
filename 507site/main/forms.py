@@ -90,6 +90,8 @@ class TaskForm(forms.ModelForm):
 
         self.fields['status'].disabled = True
         self.fields['status'].required = False
+        
+        self.fields['story_points'].required = False
 
 class SprintForm(forms.ModelForm):
     class Meta:

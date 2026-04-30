@@ -427,7 +427,7 @@ class TaskModelTests(TestCase):
         # Check defaults
         self.assertEqual(task.status, 'BACKLOG')
         self.assertEqual(task.priority, 3)  # Medium
-        self.assertEqual(task.story_points, 1)
+        self.assertIsNone(task.story_points)
         self.assertIsNone(task.assigned_to)
         
     def test_task_ordering(self):
