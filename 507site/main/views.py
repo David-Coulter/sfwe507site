@@ -370,17 +370,17 @@ def sprint_board(request, sprint_pk):
     in_review_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'IN_REVIEW']
     done_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
 
-    not_started_points = sum(t.story_points for t in not_started_tasks)
-    in_progress_points = sum(t.story_points for t in in_progress_tasks)
-    in_review_points = sum(t.story_points for t in in_review_tasks)
-    done_points = sum(t.story_points for t in done_tasks)
+    not_started_points = sum(t.story_points or 0 for t in not_started_tasks)
+    in_progress_points = sum(t.story_points or 0 for t in in_progress_tasks)
+    in_review_points = sum(t.story_points or 0 for t in in_review_tasks)
+    done_points = sum(t.story_points or 0 for t in done_tasks)
 
     total_tasks = len(all_sprint_tasks)
-    total_story_points = sum(t.story_points for t in all_sprint_tasks)
+    total_story_points = sum(t.story_points or 0 for t in all_sprint_tasks)
 
     completed_tasks_list = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
     completed_tasks = len(completed_tasks_list)
-    completed_story_points = sum(t.story_points for t in completed_tasks_list)
+    completed_story_points = sum(t.story_points or 0 for t in completed_tasks_list)
 
     context = {
         'sprint': sprint,
@@ -437,7 +437,7 @@ def create_sprint(request):
 def edit_sprint(request, sprint_pk):
     sprint = Sprint.objects.get(pk=sprint_pk)
 
-    if sprint.status == 'COMPLETE':
+    if sprint.status == 'COMPLETED':
         messages.error(request, f'{sprint.name} is completed and cannot be edited.')
         return redirect('sprint_board', sprint_pk=sprint.pk)
 
@@ -557,7 +557,7 @@ def complete_sprint(request, sprint_pk):
             messages.error(request, 'Please select where to move unfinished tasks.')
             return redirect('complete_sprint', sprint_pk=sprint.pk)
 
-        sprint.status = 'COMPLETE'
+        sprint.status = 'COMPLETED'
         if not sprint.end_date:
             sprint.end_date = timezone.now().date()
         sprint.save()
@@ -650,16 +650,22 @@ def move_to_sprint(request, task_pk, sprint_pk):
     task = Task.objects.get(pk=task_pk)
     sprint = Sprint.objects.get(pk=sprint_pk)
 
+    # Prevent assignment to already-assigned sprints
     if task.sprint and task.sprint.status in ['PLANNING', 'ACTIVE']:
         messages.error(request, f'Task "{task.title}" is already assigned to {task.sprint.name}!')
+        return redirect('product_backlog')
+
+    # Prevent assignment to completed sprints
+    if sprint.status == 'COMPLETED':
+        messages.error(request, f'Cannot assign tasks to completed sprint "{sprint.name}"!')
         return redirect('product_backlog')
 
     old_sprint = task.sprint.name if task.sprint else ''
     old_status = task.get_status_display()
     old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
-    task.sprint = target_sprint
-    task.planned_sprint = target_sprint 
+    task.sprint = sprint
+    task.planned_sprint = sprint
     task.status = 'SPRINT'
     task.sprint_progress = 'NOT_STARTED'
     task.save()
