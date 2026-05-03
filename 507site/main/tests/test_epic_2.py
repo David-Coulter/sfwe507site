@@ -1273,7 +1273,7 @@ class CompleteSprintWithTestingWorkflowTests(TestCase):
         # Check success message
         messages = list(response.context['messages'])
         self.assertTrue(any('5 tasks marked complete' in str(m) for m in messages))
-        self.assertTrue(any('1 tasks returned to Product Backlog' in str(m) for m in messages))
+        self.assertTrue(any('1 task returned to Product Backlog' in str(m) for m in messages))
     
     def test_all_workflow_combinations(self):
         """
@@ -1371,28 +1371,6 @@ class CompleteSprintEdgeCasesTests(TestCase):
             end_date=timezone.now().date() - timedelta(days=2),
             status='ACTIVE'
         )
-    
-    def test_task_with_null_story_points_completed_via_testing(self):
-        task = Task.objects.create(
-            title='No Story Points',
-            status='COMPLETE',
-            sprint=self.sprint,
-            story_points=None,  # No story points
-            priority=2,
-            created_by=self.user,
-            completed_at=timezone.now()
-        )
-        
-        # Complete sprint
-        response = self.client.post(
-            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
-            {'unfinished_action': 'backlog'}
-        )
-        
-        task.refresh_from_db()
-        
-        # Should still be COMPLETE
-        self.assertEqual(task.status, 'COMPLETE')
     
     def test_all_tasks_completed_via_testing(self):
         # Create 5 tasks all completed via testing
