@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Log Time - PDMS{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Log Time for {{ task.title }}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+
+                    <p>
+                        <strong>Estimated Hours:</strong>
+                        {{ task.estimated_hours|default:"Not Set" }}
+                    </p>
+
+                    <p>
+                        <strong>Current Actual Hours:</strong>
+                        {{ task.actual_hours }}
+                    </p>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Hours Spent
+                            </label>
+                            {{ form.hours_spent }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Notes
+                            </label>
+                            {{ form.notes }}
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            Log Time
+                        </button>
+
+                        <a href="{% url 'task_detail' task.pk %}"
+                           class="btn btn-secondary">
+                           Cancel
+                        </a>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

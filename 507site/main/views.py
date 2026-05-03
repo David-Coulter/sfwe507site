@@ -10,15 +10,49 @@ from django.http import HttpResponse, JsonResponse
 from django.db.models import Sum, Count, Q
 from django.contrib.auth.models import User
 from django.db import models
-from main.models import Task, Comment, TaskHistory, Sprint
-from .forms import TaskForm, CommentForm, RegisterForm, SprintForm
-from django.template.loader import render_to_string
+from main.models import Task, Comment, TaskHistory, Sprint, TimeEntry
+from .forms import TaskForm, CommentForm, RegisterForm, SprintForm, TimeEntryForm
 from django.template.loader import render_to_string
 from collections import defaultdict
-from weasyprint import HTML, CSS
-from weasyprint.text.fonts import FontConfiguration
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.views import LoginView
+
+try:
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+except ImportError:
+    HTML = None
+    CSS = None
+    FontConfiguration = None
+except OSError:
+    HTML = None
+    CSS = None
+    FontConfiguration = None
 import csv
 import json
+
+class RememberMeLoginView(LoginView):
+    template_name = "registration/login.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["remembered_username"] = self.request.COOKIES.get("remembered_username", "")
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        if self.request.POST.get("remember_me"):
+            response.set_cookie(
+                "remembered_username",
+                form.get_user().get_username(),
+                max_age=60 * 60 * 24 * 30,
+                samesite="Lax",
+            )
+        else:
+            response.delete_cookie("remembered_username")
+
+        return response
 
 
 def log_task_history(task, field_changed, old_value, new_value, changed_by, notes=''):
@@ -50,7 +84,35 @@ def register(request):
 
     return render(request, 'registration/register.html', {'form': form})
 
+def password_reset_demo_confirm(request):
+    user = User.objects.first()
 
+    if not user:
+        messages.error(request, "No user available for password reset.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = SetPasswordForm(user, request.POST)
+
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                'Your password has been reset successfully.'
+            )
+            return redirect('password_reset_complete')
+
+    else:
+        form = SetPasswordForm(user)
+
+    return render(
+        request,
+        'registration/password_reset_confirm.html',
+        {
+            'form': form
+        }
+    )
+    
 @login_required
 def dashboard(request):
     backlog_count = Task.objects.filter(status='BACKLOG').count()
@@ -60,14 +122,68 @@ def dashboard(request):
 
     my_tasks = Task.objects.filter(assigned_to=request.user).exclude(status='COMPLETE')
 
+    active_sprint = Sprint.objects.filter(status='ACTIVE').first()
+
+    active_sprint_tasks = Task.objects.none()
+    active_sprint_total_tasks = 0
+    active_sprint_complete_tasks = 0
+    active_sprint_testing_tasks = 0
+    
+    testing_attention_tasks = Task.objects.filter(
+        status='TESTING'
+    ).order_by('moved_to_testing_at')[:5]
+
+    if active_sprint:
+        active_sprint_tasks = Task.objects.filter(sprint=active_sprint)
+        active_sprint_total_tasks = active_sprint_tasks.count()
+        active_sprint_complete_tasks = active_sprint_tasks.filter(status='COMPLETE').count()
+        active_sprint_testing_tasks = active_sprint_tasks.filter(status='TESTING').count()
+
     context = {
         'backlog_count': backlog_count,
         'sprint_count': sprint_count,
         'testing_count': testing_count,
         'complete_count': complete_count,
         'my_tasks': my_tasks,
+        'active_sprint': active_sprint,
+        'active_sprint_total_tasks': active_sprint_total_tasks,
+        'active_sprint_complete_tasks': active_sprint_complete_tasks,
+        'active_sprint_testing_tasks': active_sprint_testing_tasks,
+        'testing_attention_tasks': testing_attention_tasks,
     }
     return render(request, 'main/dashboard.html', context)
+    
+@login_required
+def log_time_entry(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+
+    if task.assigned_to != request.user:
+        messages.error(request, "Only the assigned user can log time.")
+        return redirect('task_detail', pk=task.pk)
+
+    if request.method == 'POST':
+        form = TimeEntryForm(request.POST)
+
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.task = task
+            entry.user = request.user
+            entry.save()
+
+            messages.success(request, "Time entry logged successfully.")
+            return redirect('task_detail', pk=task.pk)
+
+    else:
+        form = TimeEntryForm()
+
+    return render(
+        request,
+        'main/log_time_entry.html',
+        {
+            'task': task,
+            'form': form
+        }
+    )
 
 
 @login_required
@@ -254,17 +370,17 @@ def sprint_board(request, sprint_pk):
     in_review_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'IN_REVIEW']
     done_tasks = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
 
-    not_started_points = sum(t.story_points for t in not_started_tasks)
-    in_progress_points = sum(t.story_points for t in in_progress_tasks)
-    in_review_points = sum(t.story_points for t in in_review_tasks)
-    done_points = sum(t.story_points for t in done_tasks)
+    not_started_points = sum(t.story_points or 0 for t in not_started_tasks)
+    in_progress_points = sum(t.story_points or 0 for t in in_progress_tasks)
+    in_review_points = sum(t.story_points or 0 for t in in_review_tasks)
+    done_points = sum(t.story_points or 0 for t in done_tasks)
 
     total_tasks = len(all_sprint_tasks)
-    total_story_points = sum(t.story_points for t in all_sprint_tasks)
+    total_story_points = sum(t.story_points or 0 for t in all_sprint_tasks)
 
     completed_tasks_list = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
     completed_tasks = len(completed_tasks_list)
-    completed_story_points = sum(t.story_points for t in completed_tasks_list)
+    completed_story_points = sum(t.story_points or 0 for t in completed_tasks_list)
 
     context = {
         'sprint': sprint,
@@ -321,7 +437,7 @@ def create_sprint(request):
 def edit_sprint(request, sprint_pk):
     sprint = Sprint.objects.get(pk=sprint_pk)
 
-    if sprint.status == 'COMPLETE':
+    if sprint.status == 'COMPLETED':
         messages.error(request, f'{sprint.name} is completed and cannot be edited.')
         return redirect('sprint_board', sprint_pk=sprint.pk)
 
@@ -438,7 +554,8 @@ def complete_sprint(request, sprint_pk):
                 old_status = task.get_status_display()
                 old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
-                task.sprint = target_sprint
+                task.sprint = sprint
+                task.planned_sprint = sprint
                 task.status = 'SPRINT'
                 task.sprint_progress = 'NOT_STARTED'
                 task.save()
@@ -551,6 +668,11 @@ def move_to_sprint(request, task_pk, sprint_pk):
     
     if sprint.status == 'COMPLETED':
         messages.error(request, f'Cannot assign tasks to completed sprint {sprint.name}!')
+        return redirect('product_backlog')
+
+    # Prevent assignment to completed sprints
+    if sprint.status == 'COMPLETED':
+        messages.error(request, f'Cannot assign tasks to completed sprint "{sprint.name}"!')
         return redirect('product_backlog')
 
     old_sprint = task.sprint.name if task.sprint else ''
@@ -1125,6 +1247,14 @@ def export_sprint_report_csv(request, sprint_pk):
  
 @login_required
 def export_sprint_report_pdf(request, sprint_pk):
+
+    if HTML is None or FontConfiguration is None:
+        response = HttpResponse(
+            b'PDF export is unavailable because WeasyPrint is not installed correctly.',
+            content_type='application/pdf'
+        )
+        response['Content-Disposition'] = f'attachment; filename="sprint_report_{sprint_pk}.pdf"'
+        return response
     
     sprint = get_object_or_404(Sprint, pk=sprint_pk)
     

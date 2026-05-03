@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
-from .models import Task, Comment, Sprint
+from .models import Task, Comment, Sprint, TimeEntry
 
 
 class RegisterForm(UserCreationForm):
@@ -90,6 +90,8 @@ class TaskForm(forms.ModelForm):
 
         self.fields['status'].disabled = True
         self.fields['status'].required = False
+        
+        self.fields['story_points'].required = False
 
 class SprintForm(forms.ModelForm):
     class Meta:
@@ -134,3 +136,21 @@ class CommentForm(forms.ModelForm):
         labels = {
             'text': '',
         }
+
+class TimeEntryForm(forms.ModelForm):
+    class Meta:
+        model = TimeEntry
+        fields = ['hours_spent', 'notes']
+        widgets = {
+            'hours_spent': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.25',
+                'min': '0.25',
+                'placeholder': 'Hours spent'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'What work was completed?'
+            }),
+        }        

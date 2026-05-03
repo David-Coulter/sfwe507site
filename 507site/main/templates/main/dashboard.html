@@ -10,22 +10,22 @@
     
     <!-- Status Cards Row -->
     <div class="row g-4 mb-4">
-        <!-- Product Backlog Card -->
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-info" >
+                    <div class="stat-number text-info">
                         {{ backlog_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-list-ul"></i> Product Backlog
                     </div>
-                    <a href="{% url 'product_backlog' %}" class="btn btn-sm mt-3" style="border: 1px solid #007D84; color: #007D84;">View All</a>
+                    <a href="{% url 'product_backlog' %}" class="btn btn-sm mt-3" style="border:1px solid #007D84;color:#007D84;">
+                        View All
+                    </a>
                 </div>
             </div>
         </div>
         
-        <!-- Sprint Backlog Card -->
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
@@ -35,43 +35,187 @@
                     <div class="stat-label">
                         <i class="bi bi-calendar-week"></i> Sprint Backlog
                     </div>
-                    <a href="{% url 'sprint_backlog' %}" class="btn btn-sm mt-3" style="border: 1px solid #81D3EB; color: #81D3EB;">View All</a>
+                    <a href="{% url 'sprint_backlog' %}" class="btn btn-sm mt-3" style="border:1px solid #81D3EB;color:#81D3EB;">
+                        View All
+                    </a>
                 </div>
             </div>
         </div>
         
-        <!-- Ready for Test Card -->
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-info" color="#A95C42">
+                    <div class="stat-number text-info">
                         {{ testing_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-clipboard-check"></i> Ready for Test
                     </div>
-                    <a href="{% url 'testing_queue' %}" class="btn btn-sm mt-3" style="border: 1px solid #A95C42; color: #A95C42;">View All</a>
+                    <a href="{% url 'testing_queue' %}" class="btn btn-sm mt-3" style="border:1px solid #A95C42;color:#A95C42;">
+                        View All
+                    </a>
                 </div>
             </div>
         </div>
         
-        <!-- Complete Card -->
         <div class="col-md-3">
             <div class="card stat-card text-center">
                 <div class="card-body">
-                    <div class="stat-number text-success" color="#70B865">
+                    <div class="stat-number text-success">
                         {{ complete_count }}
                     </div>
                     <div class="stat-label">
                         <i class="bi bi-check-circle"></i> Complete
                     </div>
-                    <a href="{% url 'completed_tasks' %}" class="btn btn-sm mt-3" style="border: 1px solid #70B865; color: #70B865;">View All</a>
+                    <a href="{% url 'completed_tasks' %}" class="btn btn-sm mt-3" style="border:1px solid #70B865;color:#70B865;">
+                        View All
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions Sidebar -->
+
+    <!-- Active Sprint Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="bi bi-calendar-event"></i> Active Sprint
+                </div>
+                <div class="card-body">
+                    {% if active_sprint %}
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+                        <h5 class="card-title mb-0">
+                            {{ active_sprint.name }}
+                        </h5>
+
+                        <div class="mt-2 mt-md-0">
+                            <a href="{% url 'sprint_board' active_sprint.pk %}"
+                               class="btn btn-sm btn-primary">
+                                <i class="bi bi-kanban"></i>
+                                View Sprint Board
+                            </a>
+
+                            {% if user.is_staff %}
+                            <a href="{% url 'edit_sprint' active_sprint.pk %}"
+                               class="btn btn-sm btn-outline-secondary ms-2">
+                                <i class="bi bi-pencil"></i>
+                                Edit Sprint
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <p class="mb-2">
+                        <strong>Goal:</strong>
+                        {{ active_sprint.goal|default:"No sprint goal entered." }}
+                    </p>
+
+                    <p class="mb-2">
+                        <strong>Dates:</strong>
+                        {{ active_sprint.start_date|default:"No start date" }}
+                        to
+                        {{ active_sprint.end_date|default:"No end date" }}
+                    </p>
+
+                    <div class="row text-center mt-3">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <h4 class="mb-0">{{ active_sprint_total_tasks }}</h4>
+                                <small class="text-muted">
+                                    Total Sprint Tasks
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <h4 class="mb-0">{{ active_sprint_testing_tasks }}</h4>
+                                <small class="text-muted">
+                                    Tasks in Testing
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <h4 class="mb-0">{{ active_sprint_complete_tasks }}</h4>
+                                <small class="text-muted">
+                                    Completed Tasks
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <p class="text-muted mb-0">
+                        No active sprint is currently selected.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Testing Attention Panel -->
+{% if testing_attention_tasks %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning shadow-sm">
+            <div class="card-header bg-warning-subtle">
+                <i class="bi bi-exclamation-triangle"></i>
+                Tasks Waiting in Testing
+            </div>
+
+            <div class="card-body">
+                <div class="row">
+                    {% for task in testing_attention_tasks %}
+                    <div class="col-md-6 mb-3">
+                        <div class="border rounded p-3">
+
+                            <div class="d-flex justify-content-between">
+                                <strong>{{ task.title }}</strong>
+
+                                <span class="badge bg-warning text-dark">
+                                    Testing
+                                </span>
+                            </div>
+
+                            <small class="text-muted d-block mt-2">
+                                Priority:
+                                {{ task.get_priority_display }}
+                            </small>
+
+                            {% if task.assigned_to %}
+                            <small class="text-muted d-block">
+                                Owner:
+                                {{ task.assigned_to.username }}
+                            </small>
+                            {% endif %}
+
+                            <a href="{% url 'task_detail' task.id %}"
+                               class="btn btn-sm btn-outline-warning mt-3">
+                               Review Task
+                            </a>
+
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <a href="{% url 'testing_queue' %}"
+                   class="btn btn-warning mt-2">
+                   View Full Testing Queue
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+    <!-- Quick Actions + My Tasks -->
     <div class="row">
         <div class="col-lg-3">
             <div class="card shadow-sm mb-3">
@@ -83,12 +227,15 @@
                         <a href="{% url 'create_task' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> Create New Task
                         </a>
+
                         <a href="{% url 'product_backlog' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-list-ul"></i> View Product Backlog
                         </a>
+
                         <a href="{% url 'sprint_backlog' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-calendar-week"></i> View Sprint Backlog
                         </a>
+
                         <a href="{% url 'testing_queue' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-clipboard-check"></i> View Testing Queue
                         </a>
@@ -96,13 +243,13 @@
                 </div>
             </div>
         </div>
-    
-    <!-- My Tasks Section -->
+
         <div class="col-lg-9">
             <div class="card shadow-sm">
                 <div class="card-header">
                     <i class="bi bi-person-check"></i> My Assigned Tasks
                 </div>
+
                 <div class="card-body p-0">
                     {% if my_tasks %}
                         {% for task in my_tasks %}
@@ -110,63 +257,74 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <h6 class="mb-1">{{ task.title }}</h6>
+
                                     <small class="text-muted">
                                         <span class="badge badge-priority-{{ task.priority }}">
                                             {{ task.get_priority_display }}
                                         </span>
+
                                         <span class="badge bg-secondary ms-2">
                                             {{ task.get_status_display }}
                                         </span>
                                     </small>
                                 </div>
+
                                 <div>
-                                    <a href="{% url 'task_detail' task.id %}" class="btn btn-sm btn-outline-primary">
+                                    <a href="{% url 'task_detail' task.id %}"
+                                       class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
+
                     {% else %}
-                        <div class="p-4 text-center text-muted">
-                            <i class="bi bi-inbox" style="font-size: 3rem; color: #0C234B;"></i>
-                            <p class="mt-3">No tasks assigned to you yet.</p>
-                            <a href="{% url 'create_task' %}" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Create Your First Task
-                            </a>
-                        </div>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-inbox" style="font-size:3rem;color:#0C234B;"></i>
+                        <p class="mt-3">No tasks assigned to you yet.</p>
+
+                        <a href="{% url 'create_task' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i>
+                            Create Your First Task
+                        </a>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- System Info Section -->
+
+
+    <!-- System Info -->
     <div class="row">
         <div class="col-lg-12">
-            
-            <!-- System Info Card -->
             <div class="card shadow-sm">
                 <div class="card-header">
                     <i class="bi bi-info-circle"></i> System Info
                 </div>
+
                 <div class="card-body">
                     <p class="mb-2">
-                        <strong>Total Tasks:</strong> 
+                        <strong>Total Tasks:</strong>
                         {{ backlog_count|add:sprint_count|add:testing_count|add:complete_count }}
                     </p>
+
                     <p class="mb-2">
-                        <strong>Active:</strong> 
+                        <strong>Active:</strong>
                         {{ backlog_count|add:sprint_count|add:testing_count }}
                     </p>
+
                     <p class="mb-0">
-                        <strong>User:</strong> {{ user.username }}
+                        <strong>User:</strong>
+                        {{ user.username }}
                     </p>
                 </div>
             </div>
         </div>
     </div>
-    
+
+
     <!-- Workflow Diagram with Visual Flow -->
     <div class="row mt-4">
         <div class="col-12">

@@ -18,6 +18,7 @@ class UserAuthenticationTests(TestCase):
     
     def test_user_registration_success(self):
         #TC001: Successful user registration with valid data
+        
         response = self.client.post(reverse('register'), {
             'username': 'newuser',
             'email': 'newuser@example.com',
@@ -257,7 +258,7 @@ class CommentTests(TestCase):
         
     def test_comment_character_limit(self):
         #TC013: Comments respect 1000 character limit
-        long_text = 'x' * 1500  # 1500 characters
+        long_text = 'x' * 1500
         
         response = self.client.post(reverse('task_detail', args=[self.task.pk]), {
             'text': long_text
@@ -318,12 +319,205 @@ class TaskDetailViewTests(TestCase):
         self.assertContains(response, '5') 
         self.assertContains(response, '8.5') 
         self.assertContains(response, 'testuser')
-        self.assertContains(response, 'Comments (1)') 
+        self.assertContains(response, 'Comments (1)')
 
-
-class DashboardTests(TestCase):
-    #Test cases for User Story 17 (Dashboard)
+# Test cases for User Story 07: View Product Backlog
+class ProductBacklogViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testuser', password='pass123')
+        self.dev_user = User.objects.create_user(username='developer', password='pass123')
+        
+        # Create backlog tasks with different priorities and times
+        self.backlog_task1 = Task.objects.create(
+            title='Critical Bug Fix',
+            description='Fix production bug',
+            status='BACKLOG',
+            priority=1,  # Critical
+            story_points=8,
+            estimated_hours=16,
+            created_by=self.user,
+            assigned_to=self.dev_user
+        )
+        
+        self.backlog_task2 = Task.objects.create(
+            title='High Priority Feature',
+            description='Important feature',
+            status='BACKLOG',
+            priority=2,  # High
+            story_points=5,
+            estimated_hours=10,
+            created_by=self.user,
+            assigned_to=self.dev_user
+        )
+        
+        self.backlog_task3 = Task.objects.create(
+            title='Medium Priority Task',
+            description='Regular task',
+            status='BACKLOG',
+            priority=3,  # Medium
+            story_points=3,
+            estimated_hours=6,
+            created_by=self.user
+        )
+        
+        self.backlog_task4 = Task.objects.create(
+            title='Low Priority Enhancement',
+            description='Nice to have',
+            status='BACKLOG',
+            priority=4,  # Low
+            story_points=2,
+            estimated_hours=4,
+            created_by=self.user
+        )
+        
+        # Create tasks with other statuses (should NOT appear in backlog)
+        self.sprint_task = Task.objects.create(
+            title='Sprint Task',
+            status='SPRINT',
+            priority=2,
+            created_by=self.user
+        )
+        
+        self.complete_task = Task.objects.create(
+            title='Completed Task',
+            status='COMPLETE',
+            priority=1,
+            created_by=self.user
+        )
+        
+        self.testing_task = Task.objects.create(
+            title='Testing Task',
+            status='TESTING',
+            priority=2,
+            created_by=self.user
+        )
+        
+        self.client = Client()
+        self.client.login(username='testuser', password='pass123')
     
+    def test_backlog_view_requires_authentication(self):
+        self.client.logout()
+        response = self.client.get(reverse('product_backlog'))
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+    
+    def test_backlog_lists_only_backlog_status_tasks(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Get tasks from context
+        tasks = response.context['backlog_tasks']
+        
+        # Should have exactly 4 backlog tasks
+        self.assertEqual(tasks.count(), 4)
+        
+        # Verify all are BACKLOG status
+        for task in tasks:
+            self.assertEqual(task.status, 'BACKLOG')
+        
+        # Verify our backlog tasks are included
+        self.assertIn(self.backlog_task1, tasks)
+        self.assertIn(self.backlog_task2, tasks)
+        self.assertIn(self.backlog_task3, tasks)
+        self.assertIn(self.backlog_task4, tasks)
+        
+        # Verify non-backlog tasks are NOT included
+        self.assertNotIn(self.sprint_task, tasks)
+        self.assertNotIn(self.complete_task, tasks)
+        self.assertNotIn(self.testing_task, tasks)
+    
+    def test_backlog_displays_task_information(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Check that key information is displayed
+        self.assertContains(response, 'Critical Bug Fix')
+        self.assertContains(response, 'High Priority Feature')
+        
+        # Check story points are displayed
+        self.assertContains(response, '8')  
+        self.assertContains(response, '5') 
+        
+        # Check assigned user is displayed
+        self.assertContains(response, 'developer')
+    
+    def test_backlog_default_sort_by_priority(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        tasks = list(response.context['backlog_tasks'])
+        
+        self.assertEqual(tasks[0].priority, 1)  
+        self.assertEqual(tasks[1].priority, 2) 
+        self.assertEqual(tasks[2].priority, 3)  
+        self.assertEqual(tasks[3].priority, 4)  
+        
+        # Verify actual tasks
+        self.assertEqual(tasks[0], self.backlog_task1)  # 
+        self.assertEqual(tasks[1], self.backlog_task2)  
+        self.assertEqual(tasks[3], self.backlog_task4)  
+    
+    def test_backlog_task_links_to_detail_view(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Check that detail links are present
+        detail_url1 = reverse('task_detail', args=[self.backlog_task1.pk])
+        detail_url2 = reverse('task_detail', args=[self.backlog_task2.pk])
+        
+        self.assertContains(response, detail_url1)
+        self.assertContains(response, detail_url2)
+    
+    def test_backlog_empty_state_for_new_user(self):
+        # Create new user with no tasks
+        new_user = User.objects.create_user(username='newuser', password='pass123')
+        
+        # Delete all existing backlog tasks
+        Task.objects.filter(status='BACKLOG').delete()
+        
+        # Login as new user
+        self.client.login(username='newuser', password='pass123')
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Should show empty state
+        tasks = response.context['backlog_tasks']
+        self.assertEqual(tasks.count(), 0)
+        
+        # Check for empty state message in template
+        self.assertContains(response, 'No tasks')
+    
+    def test_backlog_shows_unassigned_tasks(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        tasks = response.context['backlog_tasks']
+        
+        # backlog_task3 and backlog_task4 are unassigned
+        self.assertIn(self.backlog_task3, tasks)
+        self.assertIn(self.backlog_task4, tasks)
+    
+    def test_backlog_displays_all_priority_levels(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Check all priority badges/indicators appear
+        self.assertContains(response, 'Critical')
+        self.assertContains(response, 'High')
+        self.assertContains(response, 'Medium')
+        self.assertContains(response, 'Low')
+    
+    def test_backlog_uses_correct_template(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'main/product_backlog.html')
+    
+    def test_create_task_button_present(self):
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Should have link/button to create new task
+        create_url = reverse('create_task')
+        self.assertContains(response, create_url)
+
+#Test cases for User Story 17 (Dashboard)
+class DashboardTests(TestCase):
     def setUp(self):
         #Set up test data
         self.user1 = User.objects.create_user(username='alice', password='pass123')
@@ -427,7 +621,7 @@ class TaskModelTests(TestCase):
         # Check defaults
         self.assertEqual(task.status, 'BACKLOG')
         self.assertEqual(task.priority, 3)  # Medium
-        self.assertEqual(task.story_points, 1)
+        self.assertIsNone(task.story_points)
         self.assertIsNone(task.assigned_to)
         
     def test_task_ordering(self):
@@ -492,3 +686,5 @@ class CommentModelTests(TestCase):
         comments = self.task.comments.all()
         
         self.assertEqual(comments.count(), 2)
+
+
