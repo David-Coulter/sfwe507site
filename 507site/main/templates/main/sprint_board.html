@@ -456,12 +456,41 @@
 .kanban-column {
     background-color: #f8f9fa;
     border-radius: 0.25rem;
+    overflow: visible !important;
+}
+
+.card.shadow-sm {
+    overflow: visible !important;
+}
+
+.card,
+.card-body,
+.col-md-3,
+.row {
+    overflow: visible !important;
 }
 
 .task-card {
+    position: relative;
     cursor: pointer;
     transition: all 0.2s;
     border-left: 3px solid transparent;
+    overflow: visible !important;
+}
+
+.task-card .dropdown-menu {
+    position: absolute !important;
+    z-index: 9999 !important;
+}
+
+.dropdown-menu {
+    position: absolute !important;
+    z-index: 10000 !important;
+    will-change: transform;
+}
+
+.dropdown.show{
+    z-index: 9999 !important;
 }
 
 .task-card:hover {

@@ -193,7 +193,14 @@ def create_task(request):
         if form.is_valid():
             task = form.save(commit=False)
             task.created_by = request.user
-            task.status = 'BACKLOG'
+            if task.sprint:
+                task.status = 'SPRINT'
+                if not task.sprint_progress:
+                    task.sprint_progress = 'NOT_STARTED'
+                if not task.planned_sprint:
+                    task.planned_sprint = task.sprint
+            else:
+                task.status = 'BACKLOG'
             task.save()
             form.save_m2m()
 
@@ -362,7 +369,7 @@ def sprint_board(request, sprint_pk):
     sprint = Sprint.objects.get(pk=sprint_pk)
 
     all_sprint_tasks = list(
-        Task.objects.filter(sprint=sprint, status='SPRINT').order_by('priority', '-created_at')
+        Task.objects.filter(sprint=sprint).exclude(status='COMPLETE').order_by('priority', '-created_at')
     )
 
     not_started_tasks = [t for t in all_sprint_tasks if not t.sprint_progress or t.sprint_progress == 'NOT_STARTED']
@@ -375,11 +382,17 @@ def sprint_board(request, sprint_pk):
     in_review_points = sum(t.story_points or 0 for t in in_review_tasks)
     done_points = sum(t.story_points or 0 for t in done_tasks)
 
-    total_tasks = len(all_sprint_tasks)
-    total_story_points = sum(t.story_points or 0 for t in all_sprint_tasks)
+    all_tasks_including_complete = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint)
+    )
+    total_tasks = all_tasks_including_complete.count()
+    total_story_points = all_tasks_including_complete.aggregate(Sum('story_points'))['story_points__sum'] or 0
 
-    completed_tasks_list = [t for t in all_sprint_tasks if t.sprint_progress == 'DONE']
-    completed_tasks = len(completed_tasks_list)
+    completed_tasks_list = all_tasks_including_complete.filter(
+        Q(sprint_progress='DONE') | Q(status='COMPLETE')
+    )
+
+    completed_tasks = completed_tasks_list.count()
     completed_story_points = sum(t.story_points or 0 for t in completed_tasks_list)
 
     context = {
@@ -914,13 +927,11 @@ def mark_ready_for_test(request, pk):
     old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
     task.status = 'TESTING'
-    task.sprint_progress = None
     task.testing_started_at = timezone.now()
     task.moved_to_testing_at = timezone.now()
     task.save()
 
     log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
-    log_task_history(task, 'Sprint Progress', old_progress, '', request.user)
 
     Comment.objects.create(
         task=task,

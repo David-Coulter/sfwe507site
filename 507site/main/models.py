@@ -110,6 +110,12 @@ class Task(models.Model):
         if self.estimated_hours:
             return self.actual_hours - self.estimated_hours
         return None
+    
+    def save(self, *args, **kwargs):
+        if self.sprint and not self.planned_sprint:
+            self.planned_sprint = self.sprint
+        
+        super().save(*args, **kwargs)
 
 
 class Comment(models.Model):

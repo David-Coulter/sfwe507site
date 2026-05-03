@@ -66,7 +66,7 @@ class MarkTaskReadyForTestTests(TestCase):
         self.assertEqual(self.task.status, 'TESTING')
         
         # Verify sprint_progress was cleared
-        self.assertIsNone(self.task.sprint_progress)
+        self.assertEqual(self.task.sprint_progress, 'DONE')
         
         # Check for success message
         messages = list(response.context['messages'])
