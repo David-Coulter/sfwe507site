@@ -479,8 +479,12 @@ def complete_sprint(request, sprint_pk):
         return redirect('sprint_board', sprint_pk=sprint.pk)
 
     all_tasks = Task.objects.filter(sprint=sprint)
-    done_tasks = all_tasks.filter(sprint_progress='DONE')
-    unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
+    done_tasks = all_tasks.filter(
+    models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+    )
+    unfinished_tasks = all_tasks.exclude(
+        models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+    )
 
     if request.method == 'POST':
         unfinished_action = request.POST.get('unfinished_action')
@@ -501,17 +505,25 @@ def complete_sprint(request, sprint_pk):
                     changed_by=request.user
                 )
 
-        done_tasks_list = list(all_tasks.filter(sprint_progress='DONE'))
-        unfinished_tasks_list = list(all_tasks.exclude(sprint_progress='DONE'))
+        done_tasks_list = list(all_tasks.filter(
+            models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+        ))
+        unfinished_tasks_list = list(all_tasks.exclude(
+            models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+        ))
 
         for task in done_tasks_list:
             old_status = task.get_status_display()
             old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
             
-            task.status = 'COMPLETE'
+            # Only update if not already COMPLETE (avoid overwriting completed_at from testing)
+            if task.status != 'COMPLETE':
+                task.status = 'COMPLETE'
+                task.completed_at = timezone.now()
+            
             task.sprint_progress = None
             task.planned_sprint = sprint
-            task.completed_at = timezone.now()
+            task.sprint = None
             task.save()
             
             log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
@@ -537,7 +549,7 @@ def complete_sprint(request, sprint_pk):
 
         elif unfinished_action == 'sprint' and target_sprint_id:
             target_sprint = Sprint.objects.get(pk=target_sprint_id)
-            for task in unfinished_tasks:
+            for task in unfinished_tasks_list:
                 old_sprint = task.sprint.name if task.sprint else ''
                 old_status = task.get_status_display()
                 old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
@@ -564,8 +576,8 @@ def complete_sprint(request, sprint_pk):
 
         messages.success(
             request,
-            f'{sprint.name} completed! {done_tasks.count()} tasks marked complete, '
-            f'{unfinished_tasks.count()} tasks {unfinished_msg}.'
+            f'{sprint.name} completed! {len(done_tasks_list)} tasks marked complete, '
+            f'{len(unfinished_tasks_list)} task{"s" if len(unfinished_tasks_list) != 1 else ""} {unfinished_msg}.'
         )
 
         return redirect('sprint_backlog')
@@ -650,9 +662,12 @@ def move_to_sprint(request, task_pk, sprint_pk):
     task = Task.objects.get(pk=task_pk)
     sprint = Sprint.objects.get(pk=sprint_pk)
 
-    # Prevent assignment to already-assigned sprints
-    if task.sprint and task.sprint.status in ['PLANNING', 'ACTIVE']:
-        messages.error(request, f'Task "{task.title}" is already assigned to {task.sprint.name}!')
+    if task.sprint and task.sprint.pk == sprint.pk:
+        messages.error(request, f'Task "{task.title}" is already assigned to {sprint.name}!')
+        return redirect('product_backlog')
+    
+    if sprint.status == 'COMPLETED':
+        messages.error(request, f'Cannot assign tasks to completed sprint {sprint.name}!')
         return redirect('product_backlog')
 
     # Prevent assignment to completed sprints
@@ -737,7 +752,9 @@ def sprint_burndown(request, sprint_pk):
         return render(request, 'main/sprint_burndown.html', context)
     
     # Calculate metrics
-    total_story_points = Task.objects.filter(sprint=sprint).aggregate(
+    total_story_points = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint)
+    ).aggregate(
         total=models.Sum('story_points')
     )['total'] or 0
 
@@ -766,7 +783,7 @@ def sprint_burndown(request, sprint_pk):
         day_end = timezone.make_aware(day_end) if timezone.is_naive(day_end) else day_end
 
         completed_points = Task.objects.filter(
-            sprint=sprint,
+            Q(sprint=sprint) | Q(planned_sprint=sprint),
             status='COMPLETE',
             completed_at__lte=day_end
         ).aggregate(total=models.Sum('story_points'))['total'] or 0
@@ -818,9 +835,13 @@ def sprint_burndown(request, sprint_pk):
                 status_message = 'Sprint is on track!'
 
     # Calculate sprint statistics
-    completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
-    total_tasks = Task.objects.filter(sprint=sprint).count()
-    completed_tasks = Task.objects.filter(sprint=sprint, status='COMPLETE').count()
+    total_tasks = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint)
+    ).count()
+    completed_tasks = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint),
+        status='COMPLETE'
+    ).count()
     completion_percentage = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
 
     context = {
@@ -1055,7 +1076,9 @@ def sprint_report(request, sprint_pk):
     
     all_sprints = Sprint.objects.all().order_by('-created_at')
 
-    all_tasks = Task.objects.filter(sprint=sprint). select_related('assigned_to', 'created_by')
+    all_tasks = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint)
+    ).select_related('assigned_to', 'created_by')
 
     completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
     incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority', 'created_at')
@@ -1236,7 +1259,9 @@ def export_sprint_report_pdf(request, sprint_pk):
     sprint = get_object_or_404(Sprint, pk=sprint_pk)
     
     # Get all the same data as the regular report
-    all_tasks = Task.objects.filter(sprint=sprint).select_related('assigned_to', 'created_by')
+    all_tasks = Task.objects.filter(
+        Q(sprint=sprint) | Q(planned_sprint=sprint)
+    ).select_related('assigned_to', 'created_by')
     completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
     incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority', '-created_at')
     

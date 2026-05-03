@@ -915,3 +915,508 @@ class CompleteSprintTests(TestCase):
         self.assertEqual(other_sprint.status, 'ACTIVE')
         self.assertEqual(other_task.status, 'SPRINT')
         self.assertEqual(other_task.sprint, other_sprint)
+
+        """
+Additional tests for US-11: Complete Sprint
+Testing the interaction between Testing Workflow and Sprint Completion
+
+These tests verify that tasks completed via the testing workflow 
+(status='COMPLETE') are properly handled during sprint completion.
+"""
+
+from django.test import TestCase, Client
+from django.contrib.auth.models import User
+from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
+from main.models import Task, Sprint
+
+
+class CompleteSprintWithTestingWorkflowTests(TestCase):
+    """
+    Test sprint completion when tasks were completed via Testing Workflow
+    (Mark Ready → Pass Testing → status='COMPLETE')
+    
+    This addresses the bug where tasks completed via testing were 
+    incorrectly moved back to backlog during sprint completion.
+    """
+    
+    def setUp(self):
+        """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123',
+            is_staff=True
+        )
+        self.client = Client()
+        self.client.login(username='testuser', password='testpass123')
+        
+        # Create completed sprint (ended 2 days ago)
+        self.sprint = Sprint.objects.create(
+            name='Test Sprint',
+            start_date=timezone.now().date() - timedelta(days=14),
+            end_date=timezone.now().date() - timedelta(days=2),
+            status='ACTIVE',
+            goal='Test sprint with testing workflow'
+        )
+    
+    def test_tasks_completed_via_testing_stay_complete(self):
+        """
+        Critical Test: Tasks that went through testing workflow should 
+        remain COMPLETE, not move to BACKLOG
+        
+        Workflow:
+        1. Task in sprint
+        2. Mark ready for test (status='TESTING')
+        3. Pass testing (status='COMPLETE', completed_at set)
+        4. Complete sprint
+        
+        Expected: Task stays COMPLETE, appears in completed tasks view
+        """
+        # Create task that went through testing workflow
+        task = Task.objects.create(
+            title='Tested Task',
+            status='COMPLETE',  # Already completed via testing
+            sprint=self.sprint,
+            sprint_progress=None,  # No sprint progress (testing bypasses this)
+            priority=2,
+            story_points=5,
+            created_by=self.user,
+            completed_at=timezone.now() - timedelta(hours=2)  # Already has completion time
+        )
+        
+        # Complete the sprint
+        response = self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Reload task
+        task.refresh_from_db()
+        
+        # CRITICAL: Task should stay COMPLETE, not go to BACKLOG
+        self.assertEqual(task.status, 'COMPLETE')
+        
+        # Task should NOT be in sprint anymore but should reference it
+        self.assertIsNone(task.sprint)
+        self.assertEqual(task.planned_sprint, self.sprint)
+        
+        # Task should still have its original completion time
+        self.assertIsNotNone(task.completed_at)
+    
+    def test_mixed_completion_methods_handled_correctly(self):
+        """
+        Test sprint with tasks completed via BOTH methods:
+        - Some via Kanban (sprint_progress='DONE')
+        - Some via Testing (status='COMPLETE')
+        
+        All should be treated as complete and stay complete.
+        """
+        # Task completed via Kanban
+        kanban_task = Task.objects.create(
+            title='Kanban Completed Task',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='DONE',
+            priority=2,
+            story_points=3,
+            created_by=self.user
+        )
+        
+        # Task completed via Testing
+        testing_task = Task.objects.create(
+            title='Testing Completed Task',
+            status='COMPLETE',
+            sprint=self.sprint,
+            sprint_progress=None,
+            priority=2,
+            story_points=5,
+            created_by=self.user,
+            completed_at=timezone.now() - timedelta(hours=1)
+        )
+        
+        # Unfinished task
+        unfinished_task = Task.objects.create(
+            title='Unfinished Task',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='IN_PROGRESS',
+            priority=2,
+            story_points=2,
+            created_by=self.user
+        )
+        
+        # Complete sprint
+        response = self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Reload all tasks
+        kanban_task.refresh_from_db()
+        testing_task.refresh_from_db()
+        unfinished_task.refresh_from_db()
+        
+        # Both completed tasks should be COMPLETE
+        self.assertEqual(kanban_task.status, 'COMPLETE')
+        self.assertEqual(testing_task.status, 'COMPLETE')
+        
+        # Unfinished should be BACKLOG
+        self.assertEqual(unfinished_task.status, 'BACKLOG')
+        
+        # Check completed tasks count
+        completed_tasks = Task.objects.filter(status='COMPLETE')
+        self.assertEqual(completed_tasks.count(), 2)
+    
+    def test_completed_tasks_appear_in_completed_view(self):
+        """
+        After sprint completion, tasks completed via testing 
+        should appear in the "Completed Tasks" view
+        """
+        # Create tasks completed via testing
+        for i in range(3):
+            Task.objects.create(
+                title=f'Tested Task {i}',
+                status='COMPLETE',
+                sprint=self.sprint,
+                priority=2,
+                story_points=5,
+                created_by=self.user,
+                completed_at=timezone.now() - timedelta(hours=i)
+            )
+        
+        # Complete sprint
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Check completed tasks view
+        response = self.client.get(reverse('completed_tasks'))
+        
+        # All 3 tasks should appear
+        self.assertContains(response, 'Tested Task 0')
+        self.assertContains(response, 'Tested Task 1')
+        self.assertContains(response, 'Tested Task 2')
+        
+        # Verify in context
+        tasks = response.context['tasks']
+        self.assertEqual(tasks.count(), 3)
+    
+    def test_testing_completed_tasks_not_in_backlog(self):
+        """
+        Tasks completed via testing should NOT appear in product backlog
+        after sprint completion
+        """
+        # Create task completed via testing
+        task = Task.objects.create(
+            title='Should Not Be In Backlog',
+            status='COMPLETE',
+            sprint=self.sprint,
+            priority=2,
+            story_points=5,
+            created_by=self.user,
+            completed_at=timezone.now()
+        )
+        
+        # Complete sprint
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Check product backlog
+        response = self.client.get(reverse('product_backlog'))
+        
+        # Task should NOT appear in backlog
+        self.assertNotContains(response, 'Should Not Be In Backlog')
+        
+        # Verify not in backlog_tasks
+        backlog_tasks = response.context['backlog_tasks']
+        task.refresh_from_db()
+        self.assertNotIn(task, backlog_tasks)
+    
+    def test_sprint_report_shows_testing_completed_tasks(self):
+        """
+        Sprint report should show tasks completed via testing workflow
+        """
+        # Create tasks completed via testing
+        task1 = Task.objects.create(
+            title='Report Task 1',
+            status='COMPLETE',
+            sprint=self.sprint,
+            priority=2,
+            story_points=5,
+            created_by=self.user,
+            completed_at=timezone.now()
+        )
+        
+        task2 = Task.objects.create(
+            title='Report Task 2',
+            status='COMPLETE',
+            sprint=self.sprint,
+            priority=1,
+            story_points=8,
+            created_by=self.user,
+            completed_at=timezone.now()
+        )
+        
+        # Complete sprint
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Refresh sprint
+        self.sprint.refresh_from_db()
+        self.assertEqual(self.sprint.status, 'COMPLETED')
+        
+        # View sprint report
+        response = self.client.get(
+            reverse('sprint_report', kwargs={'sprint_pk': self.sprint.pk})
+        )
+        
+        # Report should show completed tasks
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Report Task 1')
+        self.assertContains(response, 'Report Task 2')
+        
+        # Check story points
+        completed_points = response.context['completed_story_points']
+        self.assertEqual(completed_points, 13)  # 5 + 8
+    
+    def test_completion_time_preserved_from_testing(self):
+        """
+        Tasks completed via testing should keep their original completed_at time,
+        not get it overwritten during sprint completion
+        """
+        original_completion_time = timezone.now() - timedelta(hours=5)
+        
+        task = Task.objects.create(
+            title='Timed Task',
+            status='COMPLETE',
+            sprint=self.sprint,
+            priority=2,
+            story_points=5,
+            created_by=self.user,
+            completed_at=original_completion_time
+        )
+        
+        # Complete sprint
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Reload task
+        task.refresh_from_db()
+        
+        # Completion time should be preserved (not updated to sprint completion time)
+        self.assertEqual(task.completed_at, original_completion_time)
+    
+    def test_done_count_includes_testing_completed_tasks(self):
+        """
+        The count of "done" tasks during sprint completion should include
+        both sprint_progress='DONE' and status='COMPLETE' tasks
+        """
+        # 2 tasks via Kanban
+        Task.objects.create(
+            title='Kanban 1',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='DONE',
+            story_points=3,
+            priority=2,
+            created_by=self.user
+        )
+        
+        Task.objects.create(
+            title='Kanban 2',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='DONE',
+            story_points=5,
+            priority=2,
+            created_by=self.user
+        )
+        
+        # 3 tasks via Testing
+        for i in range(3):
+            Task.objects.create(
+                title=f'Testing {i}',
+                status='COMPLETE',
+                sprint=self.sprint,
+                story_points=2,
+                priority=2,
+                created_by=self.user,
+                completed_at=timezone.now()
+            )
+        
+        # 1 unfinished
+        Task.objects.create(
+            title='Unfinished',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='IN_PROGRESS',
+            story_points=8,
+            priority=2,
+            created_by=self.user
+        )
+        
+        # Complete sprint
+        response = self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'},
+            follow=True
+        )
+        
+        # Check success message
+        messages = list(response.context['messages'])
+        self.assertTrue(any('5 tasks marked complete' in str(m) for m in messages))
+        self.assertTrue(any('1 task returned to Product Backlog' in str(m) for m in messages))
+    
+    def test_all_workflow_combinations(self):
+        """
+        Comprehensive test of all possible task states during sprint completion:
+        1. sprint_progress='DONE' (Kanban complete)
+        2. status='COMPLETE' (Testing complete)
+        3. sprint_progress='IN_PROGRESS' (Unfinished)
+        4. sprint_progress='NOT_STARTED' (Unfinished)
+        5. sprint_progress='IN_REVIEW' (Unfinished unless marked done)
+        """
+        # DONE via Kanban
+        done_kanban = Task.objects.create(
+            title='Done Kanban',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='DONE',
+            story_points=3,
+            priority=2,
+            created_by=self.user
+        )
+        
+        # DONE via Testing
+        done_testing = Task.objects.create(
+            title='Done Testing',
+            status='COMPLETE',
+            sprint=self.sprint,
+            story_points=5,
+            priority=2,
+            created_by=self.user,
+            completed_at=timezone.now()
+        )
+        
+        # IN_PROGRESS
+        in_progress = Task.objects.create(
+            title='In Progress',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='IN_PROGRESS',
+            story_points=2,
+            priority=2,
+            created_by=self.user
+        )
+        
+        # NOT_STARTED
+        not_started = Task.objects.create(
+            title='Not Started',
+            status='SPRINT',
+            sprint=self.sprint,
+            sprint_progress='NOT_STARTED',
+            story_points=1,
+            priority=2,
+            created_by=self.user
+        )
+        
+        # Complete sprint (unfinished to backlog)
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # Reload all
+        done_kanban.refresh_from_db()
+        done_testing.refresh_from_db()
+        in_progress.refresh_from_db()
+        not_started.refresh_from_db()
+        
+        # Verify final states
+        self.assertEqual(done_kanban.status, 'COMPLETE')
+        self.assertEqual(done_testing.status, 'COMPLETE')
+        self.assertEqual(in_progress.status, 'BACKLOG')
+        self.assertEqual(not_started.status, 'BACKLOG')
+        
+        # Verify counts
+        completed = Task.objects.filter(status='COMPLETE')
+        backlog = Task.objects.filter(status='BACKLOG')
+        
+        self.assertEqual(completed.count(), 2)
+        self.assertEqual(backlog.count(), 2)
+
+# 
+class CompleteSprintEdgeCasesTests(TestCase):
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123',
+            is_staff=True
+        )
+        self.client = Client()
+        self.client.login(username='testuser', password='testpass123')
+        
+        self.sprint = Sprint.objects.create(
+            name='Edge Case Sprint',
+            start_date=timezone.now().date() - timedelta(days=14),
+            end_date=timezone.now().date() - timedelta(days=2),
+            status='ACTIVE'
+        )
+    
+    def test_all_tasks_completed_via_testing(self):
+        # Create 5 tasks all completed via testing
+        for i in range(5):
+            Task.objects.create(
+                title=f'All Testing {i}',
+                status='COMPLETE',
+                sprint=self.sprint,
+                story_points=3,
+                priority=2,
+                created_by=self.user,
+                completed_at=timezone.now() - timedelta(hours=i)
+            )
+        
+        # Complete sprint
+        self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        # All should be COMPLETE, none in BACKLOG
+        completed = Task.objects.filter(status='COMPLETE')
+        backlog = Task.objects.filter(status='BACKLOG')
+        
+        self.assertEqual(completed.count(), 5)
+        self.assertEqual(backlog.count(), 0)
+    
+    def test_completed_task_without_sprint_progress_field(self):
+        task = Task.objects.create(
+            title='Null Progress',
+            status='COMPLETE',
+            sprint=self.sprint,
+            sprint_progress=None,  # Explicitly None
+            story_points=5,
+            priority=2,
+            created_by=self.user,
+            completed_at=timezone.now()
+        )
+        
+        # Complete sprint - should not crash
+        response = self.client.post(
+            reverse('complete_sprint', kwargs={'sprint_pk': self.sprint.pk}),
+            {'unfinished_action': 'backlog'}
+        )
+        
+        self.assertEqual(response.status_code, 302)  # Successful redirect
+        
+        task.refresh_from_db()
+        self.assertEqual(task.status, 'COMPLETE')
