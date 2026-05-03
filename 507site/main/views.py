@@ -363,8 +363,12 @@ def complete_sprint(request, sprint_pk):
         return redirect('sprint_board', sprint_pk=sprint.pk)
 
     all_tasks = Task.objects.filter(sprint=sprint)
-    done_tasks = all_tasks.filter(sprint_progress='DONE')
-    unfinished_tasks = all_tasks.exclude(sprint_progress='DONE')
+    done_tasks = all_tasks.filter(
+    models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+    )
+    unfinished_tasks = all_tasks.exclude(
+        models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+    )
 
     if request.method == 'POST':
         unfinished_action = request.POST.get('unfinished_action')
@@ -385,17 +389,24 @@ def complete_sprint(request, sprint_pk):
                     changed_by=request.user
                 )
 
-        done_tasks_list = list(all_tasks.filter(sprint_progress='DONE'))
-        unfinished_tasks_list = list(all_tasks.exclude(sprint_progress='DONE'))
+        done_tasks_list = list(all_tasks.filter(
+            models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+        ))
+        unfinished_tasks_list = list(all_tasks.exclude(
+            models.Q(sprint_progress='DONE') | models.Q(status='COMPLETE')
+        ))
 
         for task in done_tasks_list:
             old_status = task.get_status_display()
             old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
             
-            task.status = 'COMPLETE'
+            # Only update if not already COMPLETE (avoid overwriting completed_at from testing)
+            if task.status != 'COMPLETE':
+                task.status = 'COMPLETE'
+                task.completed_at = timezone.now()
+            
             task.sprint_progress = None
             task.planned_sprint = sprint
-            task.completed_at = timezone.now()
             task.save()
             
             log_task_history(task, 'Status', old_status, task.get_status_display(), request.user)
