@@ -5,7 +5,7 @@ from django.core.mail import EmailMessage
 from django.conf import settings
 from django.contrib import messages
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import time, timedelta, datetime
 from django.http import HttpResponse, JsonResponse
 from django.db.models import Sum, Count, Q
 from django.contrib.auth.models import User
@@ -530,9 +530,11 @@ def complete_sprint(request, sprint_pk):
             old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
             
             # Only update if not already COMPLETE (avoid overwriting completed_at from testing)
-            if task.status != 'COMPLETE':
-                task.status = 'COMPLETE'
-                task.completed_at = timezone.now()
+            if not task.completed_at:
+            # Cap at sprint end date (task completed at sprint completion)
+                task.completed_at = timezone.make_aware(
+                    datetime.combine(sprint.end_date, time(23, 59, 59))
+                )
             
             task.sprint_progress = None
             task.planned_sprint = sprint
@@ -567,8 +569,7 @@ def complete_sprint(request, sprint_pk):
                 old_status = task.get_status_display()
                 old_progress = task.get_sprint_progress_display() if task.sprint_progress else ''
 
-                task.sprint = sprint
-                task.planned_sprint = sprint
+                task.sprint = target_sprint
                 task.status = 'SPRINT'
                 task.sprint_progress = 'NOT_STARTED'
                 task.save()
@@ -828,7 +829,7 @@ def sprint_burndown(request, sprint_pk):
         else:
             completed_points = total_story_points - final_remaining
             completion_rate = (completed_points / total_story_points * 100) if total_story_points > 0 else 0
-            status_message = f'Sprint completed. Delivered {int(completed_points)} of {total_story_points} story points ({completion_rate:.1f}% completion).'
+            status_message = f'Sprint completed. Delivered {int(completed_points)} of {total_story_points} story points ({completion_rate:.1f}% story point completion).'
 
     else:
         # Sprint is active
@@ -1051,9 +1052,11 @@ def completed_tasks(request):
     ).order_by('-completed_at')
     
     sprint_filter = request.GET.get('sprint', '')
-    
+
     if sprint_filter:
-        tasks = tasks.filter(sprint_id=sprint_filter)
+        tasks = tasks.filter(
+            Q(sprint_id=sprint_filter) | Q(planned_sprint_id=sprint_filter)
+        )
     
     # Calculate metrics
     total_tasks = tasks.count()
@@ -1100,10 +1103,15 @@ def sprint_report(request, sprint_pk):
 
     all_tasks = Task.objects.filter(
         Q(sprint=sprint) | Q(planned_sprint=sprint)
-    ).select_related('assigned_to', 'created_by')
-
-    completed_tasks = all_tasks.filter(status='COMPLETE').order_by('-completed_at')
-    incomplete_tasks = all_tasks.exclude(status='COMPLETE').order_by('priority', 'created_at')
+    )
+    
+    completed_tasks = all_tasks.filter(
+        Q(sprint_progress='DONE') | Q(status='COMPLETE')
+    )
+    
+    incomplete_tasks = all_tasks.exclude(
+        Q(sprint_progress='DONE') | Q(status='COMPLETE')
+    )
 
     total_story_points = all_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
     completed_story_points = completed_tasks.aggregate(Sum('story_points'))['story_points__sum'] or 0
