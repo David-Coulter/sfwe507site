@@ -96,13 +96,15 @@
                                     </small>
                                 </td>
                                 <td>
-                                    {% if task.sprint %}
-                                        <span class="badge bg-primary">{{ task.sprint.name }}</span>
-                                    {% else %}
-                                        <span class="text-muted">No Sprint</span>
-                                    {% endif %}
+                                        {% if task.planned_sprint %}
+                                            <span class="badge bg-primary">{{ task.planned_sprint.name }}</span>
+                                        {% elif task.sprint %}
+                                            <span class="badge bg-primary">{{ task.sprint.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">No Sprint</span>
+                                        {% endif %}
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center" style="white-space: nowrap;">
                                     <span class="badge bg-light text-dark">{{ task.story_points }} pts</span>
                                 </td>
                                 <td>
@@ -134,7 +136,7 @@
             </div>
         </div>
 
-        <!-- Tasks Grouped by Sprint (Optional Alternative View) -->
+        <!-- Tasks Grouped by Sprint-->
         <div class="mt-4">
             <h3>Tasks by Sprint</h3>
             {% for sprint_name, sprint_tasks in tasks_by_sprint.items %}

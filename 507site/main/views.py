@@ -1065,7 +1065,9 @@ def completed_tasks(request):
     # Group tasks by sprint for display
     tasks_by_sprint = {}
     for task in tasks:
-        sprint_name = task.sprint.name if task.sprint else 'No Sprint'
+        sprint_name = (task.planned_sprint.name if task.planned_sprint 
+                    else task.sprint.name if task.sprint 
+                    else 'No Sprint')
         if sprint_name not in tasks_by_sprint:
             tasks_by_sprint[sprint_name] = []
         tasks_by_sprint[sprint_name].append(task)
@@ -1078,6 +1080,15 @@ def completed_tasks(request):
         'sprints': sprints,
         'selected_sprint': sprint_filter,
     }
+    sprint_completion_data = defaultdict(lambda: {'count': 0, 'points': 0})
+    for task in tasks:
+        sprint_key = (task.planned_sprint.name if task.planned_sprint 
+                    else task.sprint.name if task.sprint 
+                    else 'No Sprint')
+        sprint_completion_data[sprint_key]['count'] += 1
+        sprint_completion_data[sprint_key]['points'] += (task.story_points or 0)
+
+    context['sprint_completion_data'] = dict(sprint_completion_data)
     
     return render(request, 'main/completed_tasks.html', context)
 
