@@ -358,7 +358,7 @@ def product_backlog(request):
     context = {
         'backlog_tasks': backlog_tasks,
         'sprints': sprints,
-        'total_story_points': sum(t.story_points for t in backlog_tasks),
+        'total_story_points': sum(t.story_points or 0 for t in backlog_tasks),
     }
 
     return render(request, 'main/product_backlog.html', context)
@@ -896,7 +896,7 @@ def testing_queue(request):
             task.hours_in_testing = 0
 
     total_tasks = testing_tasks.count()
-    total_story_points = sum(task.story_points for task in testing_tasks)
+    total_story_points = sum(task.story_points or 0 for task in testing_tasks)
 
     sprints_with_tasks = {}
     for task in testing_tasks:
